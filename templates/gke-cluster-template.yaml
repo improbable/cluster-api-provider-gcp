@@ -1,4 +1,6 @@
 ---
+# The Cluster object is the top level owner of all resources.
+# It coordinates between the control plane and the infrastructure/machines.
 apiVersion: cluster.x-k8s.io/v1alpha3
 kind: Cluster
 metadata:
@@ -13,14 +15,20 @@ spec:
     name: "${CLUSTER_NAME}"
   controlPlaneRef:
     kind: GCPManagedControlPlane
-    apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
     name: "${CLUSTER_NAME}-control-plane"
 ---
+# Due to the nature of managed Kubernetes and the control plane implementation,
+# the infrastructure provider for a GKE cluster is basically a no-op.
+# It sets itself to ready as soon as it sees the control plane ready.
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedCluster
 metadata:
   name: "${CLUSTER_NAME}"
 ---
+# The control plane abstracts readiness and provisioning of an GKE cluster.
+# Because GKE requires a default pool, this also requires a reference to the
+# default machine pool.
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedControlPlane
 metadata:
@@ -32,6 +40,9 @@ spec:
   defaultPoolRef:
     name: nodepool0
 ---
+# We provision a default machine pool with no bootstrap data (GKE will provide it).
+# We specify a GCPManagedMachinePool as the infrastructure machine, which
+# will be reflected in GCP as node pools attached to a GKE cluster.
 apiVersion: exp.cluster.x-k8s.io/v1alpha3
 kind: MachinePool
 metadata:
@@ -46,12 +57,14 @@ spec:
         dataSecretName: ""
       clusterName: ${CLUSTER_NAME}
       infrastructureRef:
-        apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
+        apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
         kind: GCPManagedMachinePool
         name: nodepool0
         namespace: default
       version: ${KUBERNETES_VERSION}
 ---
+# The GCP-specific machine pool implementation drives the configuration of the
+# GKE node.
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedMachinePool
 metadata:
@@ -59,4 +72,3 @@ metadata:
 spec:
   machineType: "n1-standard-8"
   bootDiskSizeGB: 100
-
