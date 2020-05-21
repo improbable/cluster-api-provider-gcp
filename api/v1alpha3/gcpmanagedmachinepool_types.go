@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// ManagedMachinePoolFinalizer allows ReconcileGCPManagedMachinePool to clean up GCP resources associated with
+	// ManagedMachinePoolFinalizer allows ReconcileGCPManagedMachinePool to clean up GCP resources associated with #
 	// GCPManagedMachinePool before removing it from the apiserver.
 	ManagedMachinePoolFinalizer = "gcpmanagedmachinepool.infrastructure.cluster.x-k8s.io"
 )
