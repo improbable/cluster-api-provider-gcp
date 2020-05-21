@@ -17,55 +17,73 @@ limitations under the License.
 package v1alpha3
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
-const (
-	// ManagedClusterFinalizer allows ReconcileGCPManagedCluster to clean up GCP resources associated with GCPManagedCluster before
-	// removing it from the apiserver.
-	ManagedClusterFinalizer = "gcpmanagedcluster.infrastructure.cluster.x-k8s.io"
-)
+// GCPManagedControlPlaneSpec defines the desired state of GCPManagedControlPlane
+type GCPManagedControlPlaneSpec struct {
+	// Version defines the desired Kubernetes version.
+	// +kubebuilder:validation:MinLength:=2
+	// +kubebuilder:validation:Pattern:=^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$
+	Version string `json:"version"`
 
-// GCPManagedClusterSpec defines the desired state of GCPManagedCluster
-type GCPManagedClusterSpec struct {
+	// Project is the name of the GCP project to start the GKE cluster in.
+	Project string `json:"project"`
+
+	// Region is a string matching one of the canonical GCP region names. Examples: "us-central1", "europe-west1".
+	Region string `json:"region"`
+
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional
 	ControlPlaneEndpoint clusterv1.APIEndpoint `json:"controlPlaneEndpoint"`
+
+	// AdditionalTags is an optional set of labels to add to GCP resources managed by the GCP provider, in addition to the
+	// ones added by default.
+	// +optional
+	AdditionalTags map[string]string `json:"additionalTags,omitempty"`
+
+	// DefaultPoolRef is the specification for the default pool, without which an GKE cluster cannot be created.
+	DefaultPoolRef corev1.LocalObjectReference `json:"defaultPoolRef"`
 }
 
-// GCPManagedClusterStatus defines the observed state of GCPManagedCluster
-type GCPManagedClusterStatus struct {
-	Ready bool `json:"ready"`
+// GCPManagedControlPlaneStatus defines the observed state of GCPManagedControlPlane
+type GCPManagedControlPlaneStatus struct {
+	// Ready is true when the provider resource is ready.
+	// +optional
+	Ready bool `json:"ready,omitempty"`
+
+	// Initialized is true when the the control plane is available for initial contact.
+	// This may occur before the control plane is fully ready.
+	// In the GCPManagedControlPlane implementation, these are identical.
+	// +optional
+	Initialized bool `json:"initialized,omitempty"`
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:resource:path=gcpmanagedclusters,scope=Namespaced,categories=cluster-api
+// +kubebuilder:resource:path=gcpmanagedcontrolplanes,scope=Namespaced,categories=cluster-api,shortName=gmcp
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
-// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.cluster\\.x-k8s\\.io/cluster-name",description="Cluster to which this GCPManagedCluster belongs"
-// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready for GCE instances"
-// +kubebuilder:printcolumn:name="Network",type="string",JSONPath=".spec.network.name",description="GCP network the cluster is using"
-// +kubebuilder:printcolumn:name="Endpoint",type="string",JSONPath=".status.apiEndpoints[0]",description="API Endpoint",priority=1
 
-// GCPManagedCluster is the Schema for the gcpmanagedclusters API
-type GCPManagedCluster struct {
+// GCPManagedControlPlane is the Schema for the gcpmanagedcontrolplanes API
+type GCPManagedControlPlane struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   GCPManagedClusterSpec   `json:"spec,omitempty"`
-	Status GCPManagedClusterStatus `json:"status,omitempty"`
+	Spec   GCPManagedControlPlaneSpec   `json:"spec,omitempty"`
+	Status GCPManagedControlPlaneStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// GCPManagedClusterList contains a list of GCPManagedCluster
-type GCPManagedClusterList struct {
+// GCPManagedControlPlaneList contains a list of GCPManagedControlPlane
+type GCPManagedControlPlaneList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []GCPManagedCluster `json:"items"`
+	Items           []GCPManagedControlPlane `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&GCPManagedCluster{}, &GCPManagedClusterList{})
+	SchemeBuilder.Register(&GCPManagedControlPlane{}, &GCPManagedControlPlaneList{})
 }

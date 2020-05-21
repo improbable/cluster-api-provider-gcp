@@ -16,7 +16,7 @@ spec:
     listKind: GCPManagedControlPlaneList
     plural: gcpmanagedcontrolplanes
     shortNames:
-    - amcp
+    - gmcp
     singular: gcpmanagedcontrolplane
   scope: Namespaced
   versions:
@@ -80,10 +80,6 @@ spec:
                 description: 'Region is a string matching one of the canonical GCP
                   region names. Examples: "us-central1", "europe-west1".'
                 type: string
-              sshPublicKey:
-                description: SSHPublicKey is a string literal containing an ssh public
-                  key.
-                type: string
               version:
                 description: Version defines the desired Kubernetes version.
                 minLength: 2
@@ -93,7 +89,6 @@ spec:
             - defaultPoolRef
             - project
             - region
-            - sshPublicKey
             - version
             type: object
           status:

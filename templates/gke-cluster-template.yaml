@@ -1,0 +1,62 @@
+---
+apiVersion: cluster.x-k8s.io/v1alpha3
+kind: Cluster
+metadata:
+  name: "${CLUSTER_NAME}"
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks: ["192.168.0.0/16"]
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+    kind: GCPManagedCluster
+    name: "${CLUSTER_NAME}"
+  controlPlaneRef:
+    kind: GCPManagedControlPlane
+    apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+    name: "${CLUSTER_NAME}-control-plane"
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+kind: GCPManagedCluster
+metadata:
+  name: "${CLUSTER_NAME}"
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+kind: GCPManagedControlPlane
+metadata:
+  name: "${CLUSTER_NAME}-control-plane"
+spec:
+  version: "${KUBERNETES_VERSION}"
+  project: "${GCP_PROJECT}"
+  region: "${GCP_REGION}"
+  defaultPoolRef:
+    name: nodepool0
+---
+apiVersion: exp.cluster.x-k8s.io/v1alpha3
+kind: MachinePool
+metadata:
+  name: nodepool0
+spec:
+  clusterName: ${CLUSTER_NAME}
+  replicas: ${WORKER_MACHINE_COUNT}
+  template:
+    metadata: {}
+    spec:
+      bootstrap:
+        dataSecretName: ""
+      clusterName: ${CLUSTER_NAME}
+      infrastructureRef:
+        apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
+        kind: GCPManagedMachinePool
+        name: nodepool0
+        namespace: default
+      version: ${KUBERNETES_VERSION}
+---
+apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
+kind: GCPManagedMachinePool
+metadata:
+  name: nodepool0
+spec:
+  machineType: "n1-standard-8"
+  bootDiskSizeGB: 100
+
