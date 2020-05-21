@@ -21,7 +21,7 @@ kind: GCPManagedCluster
 metadata:
   name: "${CLUSTER_NAME}"
 ---
-apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedControlPlane
 metadata:
   name: "${CLUSTER_NAME}-control-plane"
@@ -52,7 +52,7 @@ spec:
         namespace: default
       version: ${KUBERNETES_VERSION}
 ---
-apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedMachinePool
 metadata:
   name: nodepool0
