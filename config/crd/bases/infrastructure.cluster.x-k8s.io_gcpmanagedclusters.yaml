@@ -23,18 +23,9 @@ spec:
       jsonPath: .metadata.labels.cluster\.x-k8s\.io/cluster-name
       name: Cluster
       type: string
-    - description: Cluster infrastructure is ready for GCE instances
+    - description: Cluster infrastructure is ready
       jsonPath: .status.ready
       name: Ready
-      type: string
-    - description: GCP network the cluster is using
-      jsonPath: .spec.network.name
-      name: Network
-      type: string
-    - description: API Endpoint
-      jsonPath: .status.apiEndpoints[0]
-      name: Endpoint
-      priority: 1
       type: string
     name: v1alpha3
     schema:
