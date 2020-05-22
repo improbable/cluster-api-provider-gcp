@@ -54,11 +54,11 @@ spec:
                 - pd-standard
                 - pd-ssd
                 type: string
-              machineType:
-                description: MachineType is the type of the VMs in the node pool.
+              instanceType:
+                description: InstanceType is the type of the VMs in the node pool.
                 type: string
             required:
-            - machineType
+            - instanceType
             type: object
           status:
             description: GCPManagedMachinePoolStatus defines the observed state of

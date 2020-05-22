@@ -35,14 +35,18 @@ type GCPManagedControlPlaneSpec struct {
 	// Region is a string matching one of the canonical GCP region names. Examples: "us-central1", "europe-west1".
 	Region string `json:"region"`
 
+	// Network encapsulates all things related to GCP network.
+	// +optional
+	Network ManagedNetworkSpec `json:"network"`
+
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional
 	ControlPlaneEndpoint clusterv1.APIEndpoint `json:"controlPlaneEndpoint"`
 
-	// AdditionalTags is an optional set of labels to add to GCP resources managed by the GCP provider, in addition to the
+	// AdditionalLabels is an optional set of labels to add to GCP resources managed by the GCP provider, in addition to the
 	// ones added by default.
 	// +optional
-	AdditionalTags map[string]string `json:"additionalTags,omitempty"`
+	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
 
 	// DefaultPoolRef is the specification for the default pool, without which an GKE cluster cannot be created.
 	DefaultPoolRef corev1.LocalObjectReference `json:"defaultPoolRef"`

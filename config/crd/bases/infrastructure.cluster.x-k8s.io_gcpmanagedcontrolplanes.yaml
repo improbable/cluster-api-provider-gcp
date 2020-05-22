@@ -41,12 +41,12 @@ spec:
           spec:
             description: GCPManagedControlPlaneSpec defines the desired state of GCPManagedControlPlane
             properties:
-              additionalTags:
+              additionalLabels:
                 additionalProperties:
                   type: string
-                description: AdditionalTags is an optional set of labels to add to
-                  GCP resources managed by the GCP provider, in addition to the ones
-                  added by default.
+                description: AdditionalLabels is an optional set of labels to add
+                  to GCP resources managed by the GCP provider, in addition to the
+                  ones added by default.
                 type: object
               controlPlaneEndpoint:
                 description: ControlPlaneEndpoint represents the endpoint used to
@@ -71,6 +71,19 @@ spec:
                     description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                       TODO: Add other useful fields. apiVersion, kind, uid?'
                     type: string
+                type: object
+              network:
+                description: Network encapsulates all things related to GCP network.
+                properties:
+                  name:
+                    description: Name is the name of the network to be used.
+                    type: string
+                  subnetwork:
+                    description: Subnetwork is the name of the subnetwork to be used.
+                    type: string
+                required:
+                - name
+                - subnetwork
                 type: object
               project:
                 description: Project is the name of the GCP project to start the GKE

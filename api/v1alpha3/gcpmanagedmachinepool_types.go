@@ -29,8 +29,8 @@ const (
 
 // GCPManagedMachinePoolSpec defines the desired state of GCPManagedMachinePool
 type GCPManagedMachinePoolSpec struct {
-	// MachineType is the type of the VMs in the node pool.
-	MachineType string `json:"machineType"`
+	// InstanceType is the type of the VMs in the node pool.
+	InstanceType string `json:"instanceType"`
 
 	// BootDiskSizeGB is the disk size for every machine in this pool.
 	// If you specify 0, it will apply the default size.
