@@ -57,6 +57,10 @@ spec:
               instanceType:
                 description: InstanceType is the type of the VMs in the node pool.
                 type: string
+              preemptible:
+                description: Preemptible determines if the nodes are preemptible.
+                  Defaults to false.
+                type: boolean
             required:
             - instanceType
             type: object

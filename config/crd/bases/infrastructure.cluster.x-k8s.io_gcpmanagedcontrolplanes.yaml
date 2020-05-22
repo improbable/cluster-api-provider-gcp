@@ -76,14 +76,13 @@ spec:
                 description: Network encapsulates all things related to GCP network.
                 properties:
                   name:
-                    description: Name is the name of the network to be used.
+                    description: Name is the name of the network to be used. If empty,
+                      defaults to the default network.
                     type: string
                   subnetwork:
                     description: Subnetwork is the name of the subnetwork to be used.
+                      If empty, an automatic name will be used.
                     type: string
-                required:
-                - name
-                - subnetwork
                 type: object
               project:
                 description: Project is the name of the GCP project to start the GKE

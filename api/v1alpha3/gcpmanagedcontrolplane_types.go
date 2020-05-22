@@ -37,7 +37,7 @@ type GCPManagedControlPlaneSpec struct {
 
 	// Network encapsulates all things related to GCP network.
 	// +optional
-	Network ManagedNetworkSpec `json:"network"`
+	Network *ManagedNetworkSpec `json:"network,omitempty"`
 
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.
 	// +optional

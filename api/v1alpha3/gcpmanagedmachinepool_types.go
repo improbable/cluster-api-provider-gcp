@@ -40,7 +40,12 @@ type GCPManagedMachinePoolSpec struct {
 	// DiskType is the type of boot disk for machines in this pool.
 	// Possible values include: 'pd-standard', 'pd-ssd'. Defaults to 'pd-standard'.
 	// +kubebuilder:validation:Enum=pd-standard;pd-ssd
+	// +optional
 	DiskType string `json:"diskType,omitempty"`
+
+	// Preemptible determines if the nodes are preemptible. Defaults to false.
+	// +optional
+	Preemptible bool `json:"preemptible,omitempty"`
 }
 
 // GCPManagedMachinePoolStatus defines the observed state of GCPManagedMachinePool

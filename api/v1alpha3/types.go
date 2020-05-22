@@ -104,10 +104,14 @@ type NetworkSpec struct {
 
 type ManagedNetworkSpec struct {
 	// Name is the name of the network to be used.
-	Name string `json:"name"`
+	// If empty, defaults to the default network.
+	// +optional
+	Name *string `json:"name,omitempty"`
 
 	// Subnetwork is the name of the subnetwork to be used.
-	Subnetwork string `json:"subnetwork"`
+	// If empty, an automatic name will be used.
+	// +optional
+	Subnetwork *string `json:"subnetwork,omitempty"`
 }
 
 // SubnetSpec configures an GCP Subnet.
