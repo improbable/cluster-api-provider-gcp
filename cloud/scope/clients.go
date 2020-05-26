@@ -18,9 +18,11 @@ package scope
 
 import (
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/container/v1"
 )
 
 // GCPClients contains all the gcp clients used by the scopes.
 type GCPClients struct {
-	Compute *compute.Service
+	Compute    *compute.Service
+	Containers *container.Service
 }
