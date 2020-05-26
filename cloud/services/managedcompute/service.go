@@ -32,7 +32,6 @@ type Service struct {
 	// Helper clients for GCP.
 	instances *compute.InstancesService
 	networks  *compute.NetworksService
-	firewalls *compute.FirewallsService
 	clusters  *container.ProjectsLocationsClustersService
 	nodepools *container.ProjectsLocationsClustersNodePoolsService
 }
@@ -43,7 +42,6 @@ func NewService(scope *scope.ManagedControlPlaneScope) *Service {
 		scope:     scope,
 		instances: scope.Compute.Instances,
 		networks:  scope.Compute.Networks,
-		firewalls: scope.Compute.Firewalls,
 		clusters:  scope.Containers.Projects.Locations.Clusters,
 		nodepools: scope.Containers.Projects.Locations.Clusters.NodePools,
 	}
