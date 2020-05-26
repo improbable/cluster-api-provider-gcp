@@ -33,6 +33,7 @@ rules:
   verbs:
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - cluster.x-k8s.io
@@ -43,6 +44,35 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - exp.cluster.x-k8s.io
+  resources:
+  - machinepools
+  - machinepools/status
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - exp.infrastructure.cluster.x-k8s.io
+  resources:
+  - gcpmanagedmachinepools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - exp.infrastructure.cluster.x-k8s.io
+  resources:
+  - gcpmanagedmachinepools/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
