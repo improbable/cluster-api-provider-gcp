@@ -111,3 +111,21 @@ type ManagedControlPlaneScope struct {
 func (s *ManagedControlPlaneScope) PatchObject(ctx context.Context) error {
 	return s.patchHelper.Patch(ctx, s.PatchTarget)
 }
+
+// Name returns the cluster name.
+func (s *ManagedControlPlaneScope) Name() string {
+	return s.Cluster.Name
+}
+
+// Project returns the current project name.
+func (s *ManagedControlPlaneScope) Project() string {
+	return s.ControlPlane.Spec.Project
+}
+
+// NetworkName returns the name of the network used by the cluster.
+func (s *ManagedControlPlaneScope) NetworkName() string {
+	if s.ControlPlane.Spec.Network.Name == nil {
+		return "default"
+	}
+	return *s.ControlPlane.Spec.Network.Name
+}

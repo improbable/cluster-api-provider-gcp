@@ -19,18 +19,16 @@ package compute
 import (
 	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
-	"k8s.io/utils/pointer"
-
 	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
 )
 
-// InstanceIfExists returns the existing instance or nothing if it doesn't exist.
+// ReconcileNetwork creates the VPC network if it doesn't exist
 func (s *Service) ReconcileNetwork() error {
 	// Create Network
 	spec := s.getNetworkSpec()
-	network, err := s.networks.Get(s.scope.Project(), spec.Name).Do()
+	_, err := s.networks.Get(s.scope.Project(), spec.Name).Do()
 	if gcperrors.IsNotFound(err) {
 		op, err := s.networks.Insert(s.scope.Project(), spec).Do()
 		if err != nil {
@@ -39,7 +37,7 @@ func (s *Service) ReconcileNetwork() error {
 		if err := wait.ForComputeOperation(s.scope.Compute, s.scope.Project(), op); err != nil {
 			return errors.Wrapf(err, "failed to create network")
 		}
-		network, err = s.networks.Get(s.scope.Project(), spec.Name).Do()
+		_, err = s.networks.Get(s.scope.Project(), spec.Name).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe network")
 		}
@@ -47,9 +45,8 @@ func (s *Service) ReconcileNetwork() error {
 		return errors.Wrapf(err, "failed to describe network")
 	}
 
-	s.scope.GCPCluster.Spec.Network.Name = pointer.StringPtr(network.Name)
-	s.scope.GCPCluster.Spec.Network.AutoCreateSubnetworks = pointer.BoolPtr(network.AutoCreateSubnetworks)
-	s.scope.GCPCluster.Status.Network.SelfLink = pointer.StringPtr(network.SelfLink)
+	// TODO: Create the subnetwork as well
+
 	return nil
 }
 
@@ -57,11 +54,7 @@ func (s *Service) getNetworkSpec() *compute.Network {
 	res := &compute.Network{
 		Name:                  s.scope.NetworkName(),
 		Description:           infrav1.ClusterTagKey(s.scope.Name()),
-		AutoCreateSubnetworks: true,
-	}
-
-	if s.scope.GCPCluster.Spec.Network.AutoCreateSubnetworks != nil {
-		res.AutoCreateSubnetworks = *s.scope.GCPCluster.Spec.Network.AutoCreateSubnetworks
+		AutoCreateSubnetworks: false,
 	}
 
 	return res
@@ -86,6 +79,6 @@ func (s *Service) DeleteNetwork() error {
 	if err := wait.ForComputeOperation(s.scope.Compute, s.scope.Project(), op); err != nil {
 		return errors.Wrapf(err, "failed to delete forwarding rules")
 	}
-	s.scope.GCPCluster.Spec.Network.Name = nil
+	s.scope.ControlPlane.Spec.Network.Name = nil
 	return nil
 }
