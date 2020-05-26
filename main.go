@@ -21,6 +21,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	clusterv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -47,6 +48,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = infrav1.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
+	_ = clusterv1exp.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -54,18 +56,18 @@ func main() {
 	klog.InitFlags(nil)
 
 	var (
-		metricsAddr             string
-		enableLeaderElection    bool
-		leaderElectionNamespace string
-		watchNamespace          string
-		profilerAddress         string
-		gcpClusterConcurrency   int
-		gcpMachineConcurrency   int
-		gcpManagedClusterConcurrency   int
-		gcpManagedControlPlaneConcurrency   int
-		syncPeriod              time.Duration
-		webhookPort             int
-		healthAddr              string
+		metricsAddr                       string
+		enableLeaderElection              bool
+		leaderElectionNamespace           string
+		watchNamespace                    string
+		profilerAddress                   string
+		gcpClusterConcurrency             int
+		gcpMachineConcurrency             int
+		gcpManagedClusterConcurrency      int
+		gcpManagedControlPlaneConcurrency int
+		syncPeriod                        time.Duration
+		webhookPort                       int
+		healthAddr                        string
 	)
 
 	flag.StringVar(

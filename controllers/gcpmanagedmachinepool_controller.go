@@ -31,7 +31,7 @@ import (
 // GCPManagedMachinePoolReconciler reconciles a AzureManagedMachinePool object
 type GCPManagedMachinePoolReconciler struct {
 	client.Client
-	Log      logr.Logger
+	Log logr.Logger
 }
 
 func (r *GCPManagedMachinePoolReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
@@ -49,7 +49,6 @@ func (r *GCPManagedMachinePoolReconciler) SetupWithManager(mgr ctrl.Manager, opt
 func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
 	return reconcile.Result{}, nil
 }
-
 
 // getOwnerMachinePool returns the MachinePool object owning the current resource.
 func getOwnerMachinePool(ctx context.Context, c client.Client, obj metav1.ObjectMeta) (*capiv1exp.MachinePool, error) {
