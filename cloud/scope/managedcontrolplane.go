@@ -21,6 +21,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
+	"google.golang.org/api/container/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/klogr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
@@ -64,6 +65,15 @@ func NewManagedControlPlaneScope(params ManagedControlPlaneScopeParams) (*Manage
 
 	if params.GCPClients.Compute == nil {
 		params.GCPClients.Compute = computeSvc
+	}
+
+	containerSvc, err := container.NewService(context.TODO())
+	if err != nil {
+		return nil, errors.Errorf("failed to create gcp container client: %v", err)
+	}
+
+	if params.GCPClients.Containers == nil {
+		params.GCPClients.Containers = containerSvc
 	}
 
 	helper, err := patch.NewHelper(params.PatchTarget, params.Client)
