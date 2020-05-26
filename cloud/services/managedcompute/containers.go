@@ -85,6 +85,7 @@ func (s *Service) getGKESpec() *container.Cluster {
 					MachineType: s.scope.InfraMachinePool.Spec.InstanceType,
 					Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
 				},
+				Name: s.scope.MachinePool.Name,
 			},
 		},
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
