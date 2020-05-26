@@ -61,6 +61,8 @@ func main() {
 		profilerAddress         string
 		gcpClusterConcurrency   int
 		gcpMachineConcurrency   int
+		gcpManagedClusterConcurrency   int
+		gcpManagedControlPlaneConcurrency   int
 		syncPeriod              time.Duration
 		webhookPort             int
 		healthAddr              string
@@ -111,6 +113,18 @@ func main() {
 		"gcpmachine-concurrency",
 		10,
 		"Number of GCPMachines to process simultaneously",
+	)
+
+	flag.IntVar(&gcpManagedClusterConcurrency,
+		"gcpmanagedcluster-concurrency",
+		10,
+		"Number of GCPManagedClusters to process simultaneously",
+	)
+
+	flag.IntVar(&gcpManagedControlPlaneConcurrency,
+		"gcpmanagedcontrolplane-concurrency",
+		10,
+		"Number of GCPManagedControlPlane to process simultaneously",
 	)
 
 	flag.DurationVar(&syncPeriod,
@@ -178,6 +192,20 @@ func main() {
 			Log:    ctrl.Log.WithName("controllers").WithName("GCPCluster"),
 		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpClusterConcurrency}); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "GCPCluster")
+			os.Exit(1)
+		}
+		if err = (&controllers.GCPManagedClusterReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedCluster"),
+		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedClusterConcurrency}); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GCPManagedCluster")
+			os.Exit(1)
+		}
+		if err = (&controllers.GCPManagedControlPlaneReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedControlPlane"),
+		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedControlPlaneConcurrency}); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "GCPManagedControlPlane")
 			os.Exit(1)
 		}
 	} else {
