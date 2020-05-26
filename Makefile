@@ -279,8 +279,8 @@ create-management-cluster: $(KUSTOMIZE) $(ENVSUBST)
 	kubectl create -f https://github.com/jetstack/cert-manager/releases/download/v0.11.1/cert-manager.yaml
 	kubectl wait --for=condition=Available --timeout=5m apiservice v1beta1.webhook.cert-manager.io
 
-	# Deploy CAPI
-	kubectl apply -f https://github.com/kubernetes-sigs/cluster-api/releases/download/v0.3.6/cluster-api-components.yaml
+	# Deploy CAPI with MachinePool feature gate enabled
+	kubectl apply -f hack/cluster-api-components-with-machinepool.yaml
 
 	# Deploy CAPG
 	kind load docker-image $(CONTROLLER_IMG)-$(ARCH):$(TAG) --name=clusterapi
