@@ -35,12 +35,12 @@ import (
 // ManagedControlPlaneScopeParams defines the input parameters used to create a new Scope.
 type ManagedControlPlaneScopeParams struct {
 	GCPClients
-	Client            client.Client
-	Logger            logr.Logger
-	Cluster           *clusterv1.Cluster
-	ControlPlane      *infrav1.GCPManagedControlPlane
-	InfraMachinePool  *infrav1.GCPManagedMachinePool
-	MachinePool       *expv1.MachinePool
+	Client           client.Client
+	Logger           logr.Logger
+	Cluster          *clusterv1.Cluster
+	ControlPlane     *infrav1.GCPManagedControlPlane
+	InfraMachinePool *infrav1.GCPManagedMachinePool
+	MachinePool      *expv1.MachinePool
 	PatchTarget      runtime.Object
 }
 
@@ -100,10 +100,10 @@ type ManagedControlPlaneScope struct {
 	patchHelper *patch.Helper
 
 	GCPClients
-	Cluster    *clusterv1.Cluster
-	ControlPlane      *infrav1.GCPManagedControlPlane
-	InfraMachinePool  *infrav1.GCPManagedMachinePool
-	MachinePool       *expv1.MachinePool
+	Cluster          *clusterv1.Cluster
+	ControlPlane     *infrav1.GCPManagedControlPlane
+	InfraMachinePool *infrav1.GCPManagedMachinePool
+	MachinePool      *expv1.MachinePool
 	PatchTarget      runtime.Object
 }
 
