@@ -301,7 +301,7 @@ create-management-cluster: $(KUSTOMIZE) $(ENVSUBST)
 .PHONY: create-workload-cluster
 create-workload-cluster: $(KUSTOMIZE) $(ENVSUBST)
 	# Create workload Cluster.
-	$(KUSTOMIZE) build templates | $(ENVSUBST) | kubectl apply -f -
+	$(KUSTOMIZE) build templates/flavors/default | $(ENVSUBST) | kubectl apply -f -
 
 	# Wait for the kubeconfig to become available.
 	timeout 5m bash -c "while ! kubectl get secrets | grep $(CLUSTER_NAME)-kubeconfig; do sleep 1; done"
@@ -313,6 +313,11 @@ create-workload-cluster: $(KUSTOMIZE) $(ENVSUBST)
 	kubectl --kubeconfig=./kubeconfig apply -f https://docs.projectcalico.org/manifests/calico.yaml
 
 	@echo 'run "kubectl --kubeconfig=./kubeconfig ..." to work with the new target cluster'
+
+.PHONY: create-gke-workload-cluster
+create-gke-workload-cluster: $(KUSTOMIZE) $(ENVSUBST)
+	# Create GKE workload Cluster.
+	$(KUSTOMIZE) build templates/flavors/gke | $(ENVSUBST) | kubectl apply -f -
 
 .PHONY: create-cluster
 create-cluster: create-management-cluster create-workload-cluster ## Create a development Kubernetes cluster on GCP in a KIND management cluster.
