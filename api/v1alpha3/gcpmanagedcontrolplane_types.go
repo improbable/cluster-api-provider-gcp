@@ -22,6 +22,12 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
+const (
+	// ManagedControlPlaneFinalizer allows ReconcileGCPManagedControlPlane to clean up GCP resources associated with
+	// ReconcileGCPManagedControlPlane before removing it from the apiserver.
+	ManagedControlPlaneFinalizer = "gcpmanagedcontrolplane.infrastructure.cluster.x-k8s.io"
+)
+
 // GCPManagedControlPlaneSpec defines the desired state of GCPManagedControlPlane
 type GCPManagedControlPlaneSpec struct {
 	// Version defines the desired Kubernetes version.

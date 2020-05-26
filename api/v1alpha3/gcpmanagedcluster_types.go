@@ -21,12 +21,6 @@ import (
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
 
-const (
-	// ManagedClusterFinalizer allows ReconcileGCPManagedCluster to clean up GCP resources associated with GCPManagedCluster before
-	// removing it from the apiserver.
-	ManagedClusterFinalizer = "gcpmanagedcluster.infrastructure.cluster.x-k8s.io"
-)
-
 // GCPManagedClusterSpec defines the desired state of GCPManagedCluster
 type GCPManagedClusterSpec struct {
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.

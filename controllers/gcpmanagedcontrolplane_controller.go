@@ -21,14 +21,13 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
 	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -123,9 +122,34 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 
 	// Handle deleted clusters
 	if !gcpControlPlane.DeletionTimestamp.IsZero() {
-		//return r.reconcileDelete(ctx, mcpScope)
+		return r.reconcileDelete(ctx, mcpScope)
 	}
 
 	// Handle non-deleted clusters
-	//return r.reconcileNormal(ctx, mcpScope)
+	return r.reconcileNormal(ctx, mcpScope)
+}
+
+func (r *GCPManagedControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *scope.ManagedControlPlaneScope) (ctrl.Result, error) {
+	scope.Info("Handling deleted GCPManagedControlPlane")
+
+	// TODO: Delete GKE cluster
+
+	return ctrl.Result{}, nil
+}
+
+func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, scope *scope.ManagedControlPlaneScope) (ctrl.Result, error) {
+	scope.Info("Reconciling GCPManagedControlPlane")
+
+	// If the GCPManagedControlPlane doesn't have our finalizer, add it.
+	controllerutil.AddFinalizer(scope.ControlPlane, infrav1.ManagedControlPlaneFinalizer)
+	// Register the finalizer immediately to avoid orphaning GCP resources on delete
+	if err := scope.PatchObject(ctx); err != nil {
+		return reconcile.Result{}, err
+	}
+
+	// TODO: Reconcile network
+
+	// TODO: Reconcile GKE cluster
+
+	return ctrl.Result{}, nil
 }
