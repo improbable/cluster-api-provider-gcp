@@ -23,6 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
+	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	"sigs.k8s.io/cluster-api/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,9 +148,15 @@ func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, 
 		return reconcile.Result{}, err
 	}
 
-	// TODO: Reconcile network
+	computeSvc := managedcompute.NewService(scope)
 
-	// TODO: Reconcile GKE cluster
+	if err := computeSvc.ReconcileNetwork(); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile network for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
+	}
+
+	if err := computeSvc.ReconcileGKECluster(); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
+	}
 
 	return ctrl.Result{}, nil
 }

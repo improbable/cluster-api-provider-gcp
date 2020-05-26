@@ -18,6 +18,7 @@ package scope
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
@@ -82,7 +83,7 @@ func NewManagedControlPlaneScope(params ManagedControlPlaneScopeParams) (*Manage
 	}
 	return &ManagedControlPlaneScope{
 		Logger:           params.Logger,
-		client:           params.Client,
+		Client:           params.Client,
 		GCPClients:       params.GCPClients,
 		Cluster:          params.Cluster,
 		ControlPlane:     params.ControlPlane,
@@ -96,7 +97,7 @@ func NewManagedControlPlaneScope(params ManagedControlPlaneScopeParams) (*Manage
 // ManagedControlPlaneScope defines the basic context for an actuator to operate upon.
 type ManagedControlPlaneScope struct {
 	logr.Logger
-	client      client.Client
+	Client      client.Client
 	patchHelper *patch.Helper
 
 	GCPClients
@@ -128,4 +129,33 @@ func (s *ManagedControlPlaneScope) NetworkName() string {
 		return "default"
 	}
 	return *s.ControlPlane.Spec.Network.Name
+}
+
+// SubnetworkName returns the name of the subnetwork used by the cluster.
+func (s *ManagedControlPlaneScope) SubnetworkName() string {
+	if s.ControlPlane.Spec.Network.Name == nil {
+		return ""
+	}
+	return *s.ControlPlane.Spec.Network.Subnetwork
+}
+
+// KubernetesVersion returns the initial kubernetes version to start the cluster with.
+func (s *ManagedControlPlaneScope) KubernetesVersion() string {
+	return s.ControlPlane.Spec.Version
+}
+
+func (s *ManagedControlPlaneScope) Location() string {
+	return s.ControlPlane.Spec.Region
+}
+
+func (s *ManagedControlPlaneScope) LocationRelativeName() string {
+	return fmt.Sprintf("projects/%s/locations/%s", s.Project(), s.Location())
+}
+
+func (s *ManagedControlPlaneScope) ClusterRelativeName() string {
+	return fmt.Sprintf("%s/clusters/%s", s.LocationRelativeName(), s.ControlPlane.Name)
+}
+
+func (s *ManagedControlPlaneScope) NodePoolRelativeName() string {
+	return fmt.Sprintf("%s/nodePools/%s", s.ClusterRelativeName(), s.InfraMachinePool.Name)
 }

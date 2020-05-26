@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"google.golang.org/api/container/v1"
 	"path"
 	"time"
 
@@ -75,4 +76,46 @@ func checkComputeOperation(op *compute.Operation, err error) error {
 		errs.WriteByte('\n')
 	}
 	return errors.New(errs.String())
+}
+
+func ForContainerOperation(client *container.Service, project string, location string, op *container.Operation) error {
+	start := time.Now()
+	ctx, cf := context.WithTimeout(context.Background(), gceTimeout)
+	defer cf()
+
+	var err error
+	for {
+		if err = checkContainerOperation(op, err); err != nil || op.Status == "DONE" {
+			return err
+		}
+		klog.V(1).Infof("Wait for %v %q: %v (%s): %v", op.OperationType, op.Name, op.Status, op.Detail, op.StatusMessage)
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("gce operation %v %q timed out after %v", op.OperationType, op.Name, time.Since(start))
+		case <-time.After(gceWaitSleep):
+		}
+		op, err = getContainerOperation(client, project, location, op)
+	}
+}
+
+// getContainerOperation returns an updated operation.
+func getContainerOperation(client *container.Service, project string, location string, op *container.Operation) (*container.Operation, error) {
+	name := fmt.Sprintf("projects/%s/locations/%s/operations/%s",
+		project, location, op.Name)
+	return client.Projects.Locations.Operations.Get(name).Do()
+}
+
+func checkContainerOperation(op *container.Operation, err error) error {
+	if err != nil {
+		return err
+	}
+	if op.Status == "PENDING" || op.Status == "RUNNING" {
+		return nil
+	}
+
+	if op.StatusMessage != "" {
+		return fmt.Errorf(op.StatusMessage)
+	}
+
+	return nil
 }
