@@ -79,6 +79,12 @@ func (s *Service) getGKESpec() *container.Cluster {
 					MaxNodeCount: int64(*s.scope.MachinePool.Spec.Replicas),
 					MinNodeCount: int64(*s.scope.MachinePool.Spec.Replicas),
 				},
+				Config: &container.NodeConfig{
+					DiskSizeGb:  s.scope.DefaultNodePoolBootDiskSizeGB(),
+					DiskType:    s.scope.InfraMachinePool.Spec.DiskType,
+					MachineType: s.scope.InfraMachinePool.Spec.InstanceType,
+					Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
+				},
 			},
 		},
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,

@@ -44,7 +44,7 @@ spec:
               bootDiskSizeGB:
                 description: BootDiskSizeGB is the disk size for every machine in
                   this pool. If you specify 0, it will apply the default size.
-                format: int32
+                format: int64
                 type: integer
               diskType:
                 description: 'DiskType is the type of boot disk for machines in this

@@ -159,3 +159,10 @@ func (s *ManagedControlPlaneScope) ClusterRelativeName() string {
 func (s *ManagedControlPlaneScope) NodePoolRelativeName() string {
 	return fmt.Sprintf("%s/nodePools/%s", s.ClusterRelativeName(), s.InfraMachinePool.Name)
 }
+
+func (s *ManagedControlPlaneScope) DefaultNodePoolBootDiskSizeGB() int64 {
+	if s.InfraMachinePool.Spec.BootDiskSizeGB == nil {
+		return 0
+	}
+	return *s.InfraMachinePool.Spec.BootDiskSizeGB
+}

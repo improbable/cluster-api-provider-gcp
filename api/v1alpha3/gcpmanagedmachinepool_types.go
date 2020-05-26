@@ -35,7 +35,7 @@ type GCPManagedMachinePoolSpec struct {
 	// BootDiskSizeGB is the disk size for every machine in this pool.
 	// If you specify 0, it will apply the default size.
 	// +optional
-	BootDiskSizeGB *int32 `json:"bootDiskSizeGB,omitempty"`
+	BootDiskSizeGB *int64 `json:"bootDiskSizeGB,omitempty"`
 
 	// DiskType is the type of boot disk for machines in this pool.
 	// Possible values include: 'pd-standard', 'pd-ssd'. Defaults to 'pd-standard'.

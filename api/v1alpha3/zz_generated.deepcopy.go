@@ -678,7 +678,7 @@ func (in *GCPManagedMachinePoolSpec) DeepCopyInto(out *GCPManagedMachinePoolSpec
 	*out = *in
 	if in.BootDiskSizeGB != nil {
 		in, out := &in.BootDiskSizeGB, &out.BootDiskSizeGB
-		*out = new(int32)
+		*out = new(int64)
 		**out = **in
 	}
 }
