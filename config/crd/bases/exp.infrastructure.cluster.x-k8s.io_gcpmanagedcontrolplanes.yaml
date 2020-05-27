@@ -49,6 +49,10 @@ spec:
       jsonPath: .status.ready
       name: Ready
       type: string
+    - description: Provider status
+      jsonPath: .status.providerStatus
+      name: ProviderStatus
+      type: string
     name: v1alpha3
     schema:
       openAPIV3Schema:
@@ -142,6 +146,10 @@ spec:
                   fully ready. In the GCPManagedControlPlane implementation, these
                   are identical.
                 type: boolean
+              providerStatus:
+                description: ProviderStatus is the status of the cluster as reported
+                  by GKE
+                type: string
               ready:
                 description: Ready is true when the provider resource is ready.
                 type: boolean

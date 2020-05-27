@@ -69,6 +69,10 @@ type GCPManagedControlPlaneStatus struct {
 	// In the GCPManagedControlPlane implementation, these are identical.
 	// +optional
 	Initialized bool `json:"initialized,omitempty"`
+
+	// ProviderStatus is the status of the cluster as reported by GKE
+	// +optional
+	ProviderStatus string `json:"providerStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -81,6 +85,7 @@ type GCPManagedControlPlaneStatus struct {
 // +kubebuilder:printcolumn:name="Endpoint",type="string",priority=1,JSONPath=".spec.controlPlaneEndpoint.host",description="Control Plane Endpoint"
 // +kubebuilder:printcolumn:name="MachinePool",type="string",priority=1,JSONPath=".spec.defaultPoolRef.name",description="GCPManagedMachinePool linked to this control plane"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
+// +kubebuilder:printcolumn:name="ProviderStatus",type="string",JSONPath=".status.providerStatus",description="Provider status"
 
 // GCPManagedControlPlane is the Schema for the gcpmanagedcontrolplanes API
 type GCPManagedControlPlane struct {

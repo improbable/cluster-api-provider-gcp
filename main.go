@@ -18,9 +18,12 @@ package main
 
 import (
 	"flag"
+	"github.com/spf13/pflag"
+	"k8s.io/klog"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	infrav1controllersexp "sigs.k8s.io/cluster-api-provider-gcp/exp/controllers"
 	"sigs.k8s.io/cluster-api-provider-gcp/feature"
 	clusterv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
@@ -29,7 +32,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util/record"
@@ -45,112 +47,124 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+	metricsAddr                       string
+	enableLeaderElection              bool
+	leaderElectionNamespace           string
+	watchNamespace                    string
+	profilerAddress                   string
+	gcpClusterConcurrency             int
+	gcpMachineConcurrency             int
+	gcpManagedClusterConcurrency      int
+	gcpManagedControlPlaneConcurrency int
+	gcpManagedMachinePoolConcurrency  int
+	syncPeriod                        time.Duration
+	webhookPort                       int
+	healthAddr                        string
+
 )
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 	_ = infrav1.AddToScheme(scheme)
+	_ = infrav1exp.AddToScheme(scheme)
 	_ = clusterv1.AddToScheme(scheme)
 	_ = clusterv1exp.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 
-func main() {
+func InitFlags(fs *pflag.FlagSet) {
 	klog.InitFlags(nil)
 
-	var (
-		metricsAddr                       string
-		enableLeaderElection              bool
-		leaderElectionNamespace           string
-		watchNamespace                    string
-		profilerAddress                   string
-		gcpClusterConcurrency             int
-		gcpMachineConcurrency             int
-		gcpManagedClusterConcurrency      int
-		gcpManagedControlPlaneConcurrency int
-		syncPeriod                        time.Duration
-		webhookPort                       int
-		healthAddr                        string
-	)
-
-	flag.StringVar(
+	fs.StringVar(
 		&metricsAddr,
 		"metrics-addr",
 		":8080",
 		"The address the metric endpoint binds to.",
 	)
 
-	flag.BoolVar(
+	fs.BoolVar(
 		&enableLeaderElection,
 		"enable-leader-election",
 		false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.",
 	)
 
-	flag.StringVar(
+	fs.StringVar(
 		&watchNamespace,
 		"namespace",
 		"",
 		"Namespace that the controller watches to reconcile cluster-api objects. If unspecified, the controller watches for cluster-api objects across all namespaces.",
 	)
 
-	flag.StringVar(
+	fs.StringVar(
 		&leaderElectionNamespace,
 		"leader-election-namespace",
 		"",
 		"Namespace that the controller performs leader election in. If unspecified, the controller will discover which namespace it is running in.",
 	)
 
-	flag.StringVar(
+	fs.StringVar(
 		&profilerAddress,
 		"profiler-address",
 		"",
 		"Bind address to expose the pprof profiler (e.g. localhost:6060)",
 	)
 
-	flag.IntVar(&gcpClusterConcurrency,
+	fs.IntVar(&gcpClusterConcurrency,
 		"gcpcluster-concurrency",
 		10,
 		"Number of GCPClusters to process simultaneously",
 	)
 
-	flag.IntVar(&gcpMachineConcurrency,
+	fs.IntVar(&gcpMachineConcurrency,
 		"gcpmachine-concurrency",
 		10,
 		"Number of GCPMachines to process simultaneously",
 	)
 
-	flag.IntVar(&gcpManagedClusterConcurrency,
+	fs.IntVar(&gcpManagedClusterConcurrency,
 		"gcpmanagedcluster-concurrency",
 		10,
 		"Number of GCPManagedClusters to process simultaneously",
 	)
 
-	flag.IntVar(&gcpManagedControlPlaneConcurrency,
+	fs.IntVar(&gcpManagedControlPlaneConcurrency,
 		"gcpmanagedcontrolplane-concurrency",
 		10,
 		"Number of GCPManagedControlPlane to process simultaneously",
 	)
 
-	flag.DurationVar(&syncPeriod,
+	fs.IntVar(&gcpManagedMachinePoolConcurrency,
+		"gcpmanagedmachinepool-concurrency",
+		10,
+		"Number of GCPManagedMachinePool to process simultaneously",
+	)
+
+	fs.DurationVar(&syncPeriod,
 		"sync-period",
 		10*time.Minute,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)",
 	)
 
-	flag.IntVar(&webhookPort,
+	fs.IntVar(&webhookPort,
 		"webhook-port",
 		0,
 		"Webhook Server port, disabled by default. When enabled, the manager will only work as webhook server, no reconcilers are installed.",
 	)
 
-	flag.StringVar(&healthAddr,
+	fs.StringVar(&healthAddr,
 		"health-addr",
 		":9440",
 		"The address the health endpoint binds to.",
 	)
 
-	flag.Parse()
+	feature.MutableGates.AddFlag(fs)
+}
+
+func main() {
+	InitFlags(pflag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
 
 	if watchNamespace != "" {
 		setupLog.Info("Watching cluster-api objects only in namespace for reconciliation", "namespace", watchNamespace)
@@ -212,6 +226,13 @@ func main() {
 				Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedControlPlane"),
 			}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedControlPlaneConcurrency}); err != nil {
 				setupLog.Error(err, "unable to create controller", "controller", "GCPManagedControlPlane")
+				os.Exit(1)
+			}
+			if err = (&infrav1controllersexp.GCPManagedMachinePoolReconciler{
+				Client: mgr.GetClient(),
+				Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedMachinePool"),
+			}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedControlPlaneConcurrency}); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "GCPManagedMachinePool")
 				os.Exit(1)
 			}
 		}

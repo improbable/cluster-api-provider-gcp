@@ -42,6 +42,7 @@ func (s *Service) ReconcileGKECluster() error {
 	spec := s.getGKESpec()
 	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Do()
 	if gcperrors.IsNotFound(err) {
+		s.scope.Logger.Info("GKE cluster not found, creating")
 		op, err := s.clusters.Create(s.scope.LocationRelativeName(), &container.CreateClusterRequest{
 			Cluster: spec,
 		}).Do()
@@ -59,17 +60,21 @@ func (s *Service) ReconcileGKECluster() error {
 		return errors.Wrapf(err, "failed to describe cluster")
 	}
 
+	oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
+
+	// Reconcile provider status
+	s.scope.ControlPlane.Status.ProviderStatus = cluster.Status
+
 	// Reconcile endpoint
 	if cluster.Endpoint != "" {
-		oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
 		s.scope.ControlPlane.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
 			Host: cluster.Endpoint,
 			Port: 443,
 		}
+	}
 
-		if err := s.scope.Client.Patch(context.TODO(), s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
-			return errors.Wrapf(err, "failed to set control plane endpoint")
-		}
+	if err := s.scope.Client.Patch(context.TODO(), s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
+		return errors.Wrapf(err, "failed to set control plane endpoint")
 	}
 
 	// Reconcile kubeconfig
@@ -103,11 +108,10 @@ func (s *Service) ReconcileGKECluster() error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to write kubeconfig to yaml")
 		}
-		base64ConfigYaml := base64.StdEncoding.EncodeToString(configYaml)
 		kubeconfigSecret := makeKubeconfig(s.scope.Cluster, s.scope.ControlPlane)
 		if _, err := controllerutil.CreateOrUpdate(ctx, s.scope.Client, kubeconfigSecret, func() error {
 			kubeconfigSecret.Data = map[string][]byte{
-				secret.KubeconfigDataName: []byte(base64ConfigYaml),
+				secret.KubeconfigDataName: configYaml,
 			}
 			return nil
 		}); err != nil {
