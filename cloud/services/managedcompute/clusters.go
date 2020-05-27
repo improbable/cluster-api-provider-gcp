@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
-	"k8s.io/utils/pointer"
 	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
@@ -102,7 +101,7 @@ func (s *Service) ReconcileGKECluster() error {
 			},
 			Contexts: map[string]*clientcmdapi.Context{
 				s.scope.ControlPlane.Name: {
-					Cluster: s.scope.ControlPlane.Name,
+					Cluster:  s.scope.ControlPlane.Name,
 					AuthInfo: s.scope.ControlPlane.Name,
 				},
 			},
@@ -177,7 +176,7 @@ func (s *Service) getGKESpec() *container.Cluster {
 		// TODO: We should specify all the node pools available at creation to prevent potential master scaling and
 		// increasing provision times.
 		// https://github.com/scylladb/scylla-operator/issues/9#issuecomment-478262197
-		NodePools: s.getNodePoolsSpec(),
+		NodePools:      s.getNodePoolsSpec(),
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
 	}
 
@@ -187,93 +186,6 @@ func (s *Service) getGKESpec() *container.Cluster {
 	cluster.ResourceLabels["cluster-api-tag"] = infrav1.ClusterTagKey(s.scope.Name())
 
 	return cluster
-}
-
-func (s *Service) getNodePoolsSpec() []*container.NodePool {
-	var nodePools []*container.NodePool
-	for machinePoolName, _ := range s.scope.InfraMachinePools {
-		nodePools = append(nodePools, &container.NodePool{
-			Autoscaling: &container.NodePoolAutoscaling{
-				// TODO: autoscaling is currently not supported
-				Enabled: false,
-			},
-			Config: s.getNodePoolConfig(machinePoolName),
-			// For regional clusters, this is the node count per zone
-			InitialNodeCount: s.scope.NodePoolReplicaCount(machinePoolName),
-			Name:             s.scope.MachinePools[machinePoolName].Name,
-		})
-	}
-	return nodePools
-}
-
-func (s *Service) getNodePoolConfig(machinePoolName string) *container.NodeConfig {
-	return &container.NodeConfig{
-		DiskSizeGb:  s.scope.InfraMachinePools[machinePoolName].Spec.BootDiskSizeGB,
-		DiskType:    s.scope.InfraMachinePools[machinePoolName].Spec.DiskType,
-		MachineType: s.scope.InfraMachinePools[machinePoolName].Spec.InstanceType,
-		Preemptible: s.scope.InfraMachinePools[machinePoolName].Spec.Preemptible,
-	}
-}
-
-func (s *Service) ReconcileGKENodePool() error {
-	// Get node pool to check for existence
-	nodePool, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
-	// Create node pool if it does not exist
-	if gcperrors.IsNotFound(err) {
-		s.scope.Logger.Info("Node pool not found, creating")
-		op, err := s.nodepools.Create(s.scope.ClusterRelativeName(), &container.CreateNodePoolRequest{
-			NodePool: s.getNodePoolsSpec()[0],
-		}).Do()
-		if err != nil {
-			return errors.Wrapf(err, "failed to create node pool")
-		}
-		s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-		if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
-			return errors.Wrapf(err, "failed to create node pool")
-		}
-		s.scope.Logger.Info("Operation done", "op", op.Name)
-		nodePool, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
-		if err != nil {
-			return errors.Wrapf(err, "failed to describe cluster")
-		}
-	}
-	// TODO: Update node pool if it has been modified
-	oldMachinePool := s.scope.InfraMachinePools["default"].DeepCopyObject()
-
-	// Reconcile provider status
-	s.scope.InfraMachinePools["default"].Status.ProviderStatus = nodePool.Status
-	if nodePool.Status == "ERROR" || nodePool.Status == "RUNNING_WITH_ERROR" {
-		s.scope.InfraMachinePools["default"].Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
-	}
-
-	s.scope.Logger.Info("Patching machine pool status")
-	if err := s.scope.Client.Patch(context.TODO(), s.scope.InfraMachinePools["default"], client.MergeFrom(oldMachinePool)); err != nil {
-		return errors.Wrapf(err, "failed to patch infra machine pool")
-	}
-
-	return nil
-}
-
-func (s *Service) DeleteGKENodePool() error {
-	_, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
-	if gcperrors.IsNotFound(err) {
-		return nil
-	}
-	op, err := s.nodepools.Delete(s.scope.NodePoolRelativeName("default")).Do()
-	if err != nil {
-		return errors.Wrapf(err, "failed to delete nodepool")
-	}
-	s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-	if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
-		return errors.Wrapf(err, "failed to delete nodepool")
-	}
-	s.scope.Logger.Info("Operation done", "op", op.Name)
-	_, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
-	if gcperrors.IsNotFound(err) {
-		return nil
-	}
-
-	return errors.New("failed to delete cluster")
 }
 
 func makeKubeconfig(cluster *clusterv1.Cluster, controlPlane *infrav1exp.GCPManagedControlPlane) *corev1.Secret {

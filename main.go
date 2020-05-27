@@ -45,8 +45,8 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme                            = runtime.NewScheme()
+	setupLog                          = ctrl.Log.WithName("setup")
 	metricsAddr                       string
 	enableLeaderElection              bool
 	leaderElectionNamespace           string

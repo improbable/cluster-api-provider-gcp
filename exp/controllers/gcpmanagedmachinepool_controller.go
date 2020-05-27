@@ -26,13 +26,16 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	capiv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GCPManagedMachinePoolReconciler reconciles a GCPManagedMachinePool object
@@ -45,6 +48,10 @@ func (r *GCPManagedMachinePoolReconciler) SetupWithManager(mgr ctrl.Manager, opt
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&infrav1exp.GCPManagedMachinePool{}).
+		Watches(&source.Kind{Type: &clusterv1.Cluster{}},
+			&handler.EnqueueRequestsFromMapFunc{
+				ToRequests: handler.ToRequestsFunc(r.requeueGCPMachinePoolsForCluster),
+			}).
 		Complete(r)
 }
 
@@ -182,6 +189,34 @@ func (r *GCPManagedMachinePoolReconciler) reconcileNormal(ctx context.Context, s
 	scope.InfraMachinePools["default"].Status.Ready = true
 
 	return reconcile.Result{}, nil
+}
+
+func (r *GCPManagedMachinePoolReconciler) requeueGCPMachinePoolsForCluster(o handler.MapObject) []ctrl.Request {
+	c, ok := o.Object.(*clusterv1.Cluster)
+	if !ok {
+		r.Log.Error(errors.Errorf("expected a Cluster but got a %T", o.Object), "failed to get GCPMachinePool for Cluster")
+		return nil
+	}
+
+	return r.requestsForCluster(c.Namespace, c.Name)
+}
+
+func (r *GCPManagedMachinePoolReconciler) requestsForCluster(namespace, name string) []ctrl.Request {
+	log := r.Log.WithValues("Cluster", name, "Namespace", namespace)
+	labels := map[string]string{clusterv1.ClusterLabelName: name}
+	machineList := &capiv1exp.MachinePoolList{}
+	if err := r.Client.List(context.TODO(), machineList, client.InNamespace(namespace), client.MatchingLabels(labels)); err != nil {
+		log.Error(err, "failed to get owned MachinePools")
+		return nil
+	}
+
+	result := make([]ctrl.Request, 0, len(machineList.Items))
+	for _, m := range machineList.Items {
+		if m.Spec.Template.Spec.InfrastructureRef.Name != "" {
+			result = append(result, ctrl.Request{NamespacedName: client.ObjectKey{Namespace: m.Namespace, Name: m.Spec.Template.Spec.InfrastructureRef.Name}})
+		}
+	}
+	return result
 }
 
 // getOwnerMachinePool returns the MachinePool object owning the current resource.
