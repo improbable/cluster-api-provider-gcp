@@ -173,9 +173,6 @@ def capg():
     ])
 
     entrypoint = ["sh", "/start.sh", "/manager"]
-    extra_args = settings.get("extra_args")
-    if extra_args:
-        entrypoint.extend(extra_args)
 
     # Set up an image build for the provider. The live update configuration syncs the output from the local_resource
     # build into the container.
