@@ -17,79 +17,72 @@ package managedcompute
 
 import (
 	"context"
-	"encoding/base64"
-	"fmt"
 	"github.com/pkg/errors"
 	"google.golang.org/api/container/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/pointer"
-	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
-	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
-	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (s *Service) ReconcileGKENodePool() error {
+func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 	// Get node pool to check for existence
-	nodePool, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
+	nodePool, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
 	// Create node pool if it does not exist
 	if gcperrors.IsNotFound(err) {
 		s.scope.Logger.Info("Node pool not found, creating")
 		op, err := s.nodepools.Create(s.scope.ClusterRelativeName(), &container.CreateNodePoolRequest{
 			NodePool: s.getNodePoolsSpec()[0],
-		}).Do()
+		}).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to create node pool")
 		}
 		s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-		if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+		if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
 			return errors.Wrapf(err, "failed to create node pool")
 		}
 		s.scope.Logger.Info("Operation done", "op", op.Name)
-		nodePool, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
+		nodePool, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe cluster")
 		}
 	}
+
 	// TODO: Update node pool if it has been modified
+
 	oldMachinePool := s.scope.InfraMachinePools["default"].DeepCopyObject()
 
 	// Reconcile provider status
 	s.scope.InfraMachinePools["default"].Status.ProviderStatus = nodePool.Status
 	if nodePool.Status == "ERROR" || nodePool.Status == "RUNNING_WITH_ERROR" {
 		s.scope.InfraMachinePools["default"].Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
+	} else {
+		s.scope.InfraMachinePools["default"].Status.ErrorMessage = nil
 	}
 
 	s.scope.Logger.Info("Patching machine pool status")
-	if err := s.scope.Client.Patch(context.TODO(), s.scope.InfraMachinePools["default"], client.MergeFrom(oldMachinePool)); err != nil {
+	if err := s.scope.Client.Patch(ctx, s.scope.InfraMachinePools["default"], client.MergeFrom(oldMachinePool)); err != nil {
 		return errors.Wrapf(err, "failed to patch infra machine pool")
 	}
 
 	return nil
 }
 
-func (s *Service) DeleteGKENodePool() error {
-	_, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
+func (s *Service) DeleteGKENodePool(ctx context.Context) error {
+	_, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
-	op, err := s.nodepools.Delete(s.scope.NodePoolRelativeName("default")).Do()
+	op, err := s.nodepools.Delete(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete nodepool")
 	}
 	s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-	if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+	if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
 		return errors.Wrapf(err, "failed to delete nodepool")
 	}
 	s.scope.Logger.Info("Operation done", "op", op.Name)
-	_, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Do()
+	_, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
@@ -98,7 +91,7 @@ func (s *Service) DeleteGKENodePool() error {
 }
 
 func (s *Service) getNodePoolsSpec() []*container.NodePool {
-	var nodePools []*container.NodePool
+	nodePools := make([]*container.NodePool, len(s.scope.InfraMachinePools))
 	for machinePoolName := range s.scope.InfraMachinePools {
 		nodePools = append(nodePools, &container.NodePool{
 			Autoscaling: &container.NodePoolAutoscaling{

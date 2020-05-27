@@ -30,7 +30,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"time"
 )
 
 // GCPManagedControlPlaneReconciler reconciles a GCPManagedControlPlane object
@@ -50,7 +50,7 @@ func (r *GCPManagedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager, op
 // +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedcontrolplanes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
 
-func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
+func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (result ctrl.Result, reterr error) {
 	ctx := context.TODO()
 	log := r.Log.WithValues("namespace", req.Namespace, "gcpManagedControlPlane", req.Name)
 
@@ -64,12 +64,16 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 		return ctrl.Result{}, err
 	}
 
+	// Always requeue after 10 seconds, because we don't watch for changes in GKE otherwise
+	defer func() {
+		result.RequeueAfter = 10 * time.Second
+	}()
+
 	// Fetch the Cluster.
 	cluster, err := util.GetOwnerCluster(ctx, r.Client, gcpControlPlane.ObjectMeta)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
 	if cluster == nil {
 		log.Info("Cluster Controller has not yet set OwnerRef")
 		return ctrl.Result{}, nil
@@ -77,7 +81,7 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 
 	allMachinePoolList := &capiv1exp.MachinePoolList{}
 	if err = r.Client.List(ctx, allMachinePoolList, client.InNamespace(req.Namespace)); err != nil {
-		return reconcile.Result{}, errors.Wrapf(err, "failed to fetch machine pools")
+		return ctrl.Result{}, errors.Wrapf(err, "failed to fetch machine pools")
 	}
 
 	machinePools := make(map[string]*capiv1exp.MachinePool)
@@ -90,7 +94,7 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 			key := client.ObjectKey{Name: infraRef.Name, Namespace: infraRef.Namespace}
 			infraMachinePool := &infrav1exp.GCPManagedMachinePool{}
 			if err = r.Client.Get(ctx, key, infraMachinePool); err != nil {
-				return reconcile.Result{}, errors.Wrapf(err, "failed to fetch infra machine pool")
+				return ctrl.Result{}, errors.Wrapf(err, "failed to fetch infra machine pool")
 			}
 			infraMachinePools[machinePoolCopy.Name] = infraMachinePool
 		}
@@ -107,7 +111,7 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 		PatchTarget:       gcpControlPlane,
 	})
 	if err != nil {
-		return reconcile.Result{}, errors.Errorf("failed to create scope: %+v", err)
+		return ctrl.Result{}, errors.Errorf("failed to create scope: %+v", err)
 	}
 
 	// Always patch when exiting so we can persist changes to finalizers and status
@@ -131,16 +135,18 @@ func (r *GCPManagedControlPlaneReconciler) reconcileDelete(ctx context.Context, 
 
 	computeSvc := managedcompute.NewService(scope)
 
-	if err := computeSvc.DeleteGKECluster(); err != nil {
+	if err := computeSvc.DeleteGKECluster(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to delete GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
 
-	if err := computeSvc.DeleteNetwork(); err != nil {
+	if err := computeSvc.DeleteNetwork(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to delete network for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
 
 	// Cluster is deleted so remove the finalizer.
 	controllerutil.RemoveFinalizer(scope.ControlPlane, infrav1exp.ManagedControlPlaneFinalizer)
+
+	scope.Logger.Info("Successfully deleted")
 
 	return ctrl.Result{}, nil
 }
@@ -152,22 +158,24 @@ func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, 
 	controllerutil.AddFinalizer(scope.ControlPlane, infrav1exp.ManagedControlPlaneFinalizer)
 	// Register the finalizer immediately to avoid orphaning GCP resources on delete
 	if err := scope.PatchObject(ctx); err != nil {
-		return reconcile.Result{}, err
+		return ctrl.Result{}, err
 	}
 
 	computeSvc := managedcompute.NewService(scope)
 
-	if err := computeSvc.ReconcileNetwork(); err != nil {
+	if err := computeSvc.ReconcileNetwork(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile network for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
 
-	if err := computeSvc.ReconcileGKECluster(); err != nil {
+	if err := computeSvc.ReconcileGKECluster(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
 
 	// No errors, so mark us ready so the Cluster API Cluster Controller can pull it
 	scope.ControlPlane.Status.Ready = true
 	scope.ControlPlane.Status.Initialized = true
+
+	scope.Logger.Info("Successfully reconciled")
 
 	return ctrl.Result{}, nil
 }

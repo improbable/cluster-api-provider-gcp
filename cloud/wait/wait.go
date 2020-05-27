@@ -78,7 +78,7 @@ func checkComputeOperation(op *compute.Operation, err error) error {
 	return errors.New(errs.String())
 }
 
-func ForContainerOperation(client *container.Service, project string, location string, op *container.Operation) error {
+func ForContainerOperation(ctx context.Context, client *container.Service, project string, location string, op *container.Operation) error {
 	start := time.Now()
 	ctx, cf := context.WithTimeout(context.Background(), gceTimeout)
 	defer cf()

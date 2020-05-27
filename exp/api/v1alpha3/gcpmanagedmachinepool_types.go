@@ -79,6 +79,7 @@ type GCPManagedMachinePoolStatus struct {
 // +kubebuilder:resource:path=gcpmanagedmachinepools,scope=Namespaced,categories=cluster-api,shortName=gmmp
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.cluster\\.x-k8s\\.io/cluster-name",description="Cluster to which this GCPManagedMachinePool belongs"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
 // +kubebuilder:printcolumn:name="ProviderStatus",type="string",JSONPath=".status.providerStatus",description="Provider status"
 

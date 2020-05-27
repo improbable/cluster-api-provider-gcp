@@ -17,6 +17,7 @@ limitations under the License.
 package managedcompute
 
 import (
+	"context"
 	"github.com/pkg/errors"
 	"google.golang.org/api/compute/v1"
 	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
@@ -25,12 +26,12 @@ import (
 )
 
 // ReconcileNetwork creates the VPC network if it doesn't exist
-func (s *Service) ReconcileNetwork() error {
+func (s *Service) ReconcileNetwork(ctx context.Context) error {
 	// Create Network
 	spec := s.getNetworkSpec()
-	_, err := s.networks.Get(s.scope.Project(), spec.Name).Do()
+	_, err := s.networks.Get(s.scope.Project(), spec.Name).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
-		op, err := s.networks.Insert(s.scope.Project(), spec).Do()
+		op, err := s.networks.Insert(s.scope.Project(), spec).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to create network")
 		}
@@ -39,7 +40,7 @@ func (s *Service) ReconcileNetwork() error {
 			return errors.Wrapf(err, "failed to create network")
 		}
 		s.scope.Logger.Info("Operation done", "op", op.Name)
-		_, err = s.networks.Get(s.scope.Project(), spec.Name).Do()
+		_, err = s.networks.Get(s.scope.Project(), spec.Name).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe network")
 		}
@@ -64,8 +65,8 @@ func (s *Service) getNetworkSpec() *compute.Network {
 	return res
 }
 
-func (s *Service) DeleteNetwork() error {
-	network, err := s.networks.Get(s.scope.Project(), s.scope.NetworkName()).Do()
+func (s *Service) DeleteNetwork(ctx context.Context) error {
+	network, err := s.networks.Get(s.scope.Project(), s.scope.NetworkName()).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
@@ -76,7 +77,7 @@ func (s *Service) DeleteNetwork() error {
 	}
 
 	// Delete Network.
-	op, err := s.networks.Delete(s.scope.Project(), network.Name).Do()
+	op, err := s.networks.Delete(s.scope.Project(), network.Name).Context(ctx).Do()
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete forwarding rules")
 	}

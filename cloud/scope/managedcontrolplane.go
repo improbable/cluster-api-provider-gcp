@@ -47,13 +47,6 @@ type ManagedControlPlaneScopeParams struct {
 // NewManagedControlPlaneScope creates a new Scope from the supplied parameters.
 // This is meant to be called for each reconcile iteration.
 func NewManagedControlPlaneScope(params ManagedControlPlaneScopeParams) (*ManagedControlPlaneScope, error) {
-	if params.Cluster == nil {
-		return nil, errors.New("failed to generate new scope from nil Cluster")
-	}
-	if params.ControlPlane == nil {
-		return nil, errors.New("failed to generate new scope from nil ControlPlane")
-	}
-
 	if params.Logger == nil {
 		params.Logger = klogr.New()
 	}

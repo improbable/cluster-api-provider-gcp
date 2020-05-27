@@ -24,12 +24,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
-	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // GCPManagedClusterReconciler reconciles a GCPManagedCluster object
@@ -42,6 +42,11 @@ func (r *GCPManagedClusterReconciler) SetupWithManager(mgr ctrl.Manager, options
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
 		For(&infrav1exp.GCPManagedCluster{}).
+		// Watch for changes to the control plane so we can reconcile
+		Watches(&source.Kind{Type: &infrav1exp.GCPManagedControlPlane{}},
+			&handler.EnqueueRequestsFromMapFunc{
+				ToRequests: handler.ToRequestsFunc(r.requeueGCPClusterForControlPlane),
+			}).
 		Complete(r)
 }
 
@@ -53,6 +58,7 @@ func (r *GCPManagedClusterReconciler) SetupWithManager(mgr ctrl.Manager, options
 func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
 	ctx := context.TODO()
 	log := r.Log.WithValues("namespace", req.Namespace, "gcpManagedCluster", req.Name)
+	log.Info("Reconciling GCPManagedCluster")
 
 	// Fetch the GCPManagedCluster instance
 	gcpCluster := &infrav1exp.GCPManagedCluster{}
@@ -75,11 +81,6 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 		return ctrl.Result{}, nil
 	}
 
-	if annotations.IsPaused(cluster, gcpCluster) {
-		log.Info("GCPManagedCluster of linked Cluster is marked as paused. Won't reconcile")
-		return ctrl.Result{}, nil
-	}
-
 	controlPlane := &infrav1exp.GCPManagedControlPlane{}
 	controlPlaneRef := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
@@ -96,7 +97,7 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 
 	patchhelper, err := patch.NewHelper(gcpCluster, r.Client)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrap(err, "failed to init patch helper")
+		return ctrl.Result{}, errors.Wrap(err, "failed to init patch helper")
 	}
 
 	// Match whatever the control plane says. We should also enqueue
@@ -105,11 +106,34 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 	gcpCluster.Spec.ControlPlaneEndpoint = controlPlane.Spec.ControlPlaneEndpoint
 
 	if err := patchhelper.Patch(ctx, gcpCluster); err != nil {
-		return reconcile.Result{}, err
+		return ctrl.Result{}, err
 	}
 
 	log.Info("Successfully reconciled")
 
-	return reconcile.Result{}, nil
+	return ctrl.Result{}, nil
+}
 
+func (r *GCPManagedClusterReconciler) requeueGCPClusterForControlPlane(o handler.MapObject) []ctrl.Request {
+	cp, ok := o.Object.(*infrav1exp.GCPManagedControlPlane)
+	if !ok {
+		r.Log.Error(errors.Errorf("expected a GCPManagedControlPlane but got a %T", o.Object),
+			"failed to get GCPManagedCluster for GCPManagedControlPlane")
+		return nil
+	}
+
+	c, err := util.GetOwnerCluster(context.TODO(), r.Client, cp.ObjectMeta)
+	switch {
+	case err != nil:
+		r.Log.Error(err, "failed to get owning cluster")
+		return nil
+	case apierrors.IsNotFound(err) || c == nil || c.Spec.ControlPlaneRef == nil:
+		return nil
+	}
+
+	return []ctrl.Request{
+		{
+			NamespacedName: client.ObjectKey{Namespace: c.Namespace, Name: c.Spec.ControlPlaneRef.Name},
+		},
+	}
 }

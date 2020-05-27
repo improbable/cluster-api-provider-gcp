@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha3
 
 import (
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 )
@@ -53,9 +52,6 @@ type GCPManagedControlPlaneSpec struct {
 	// ones added by default.
 	// +optional
 	AdditionalLabels map[string]string `json:"additionalLabels,omitempty"`
-
-	// DefaultPoolRef is the specification for the default pool, without which an GKE cluster cannot be created.
-	DefaultPoolRef corev1.LocalObjectReference `json:"defaultPoolRef"`
 }
 
 // GCPManagedControlPlaneStatus defines the observed state of GCPManagedControlPlane
@@ -83,7 +79,6 @@ type GCPManagedControlPlaneStatus struct {
 // +kubebuilder:printcolumn:name="Project",type="string",priority=1,JSONPath=".spec.project",description="Control Plane GCP project"
 // +kubebuilder:printcolumn:name="Region",type="string",priority=1,JSONPath=".spec.region",description="Control Plane region"
 // +kubebuilder:printcolumn:name="Endpoint",type="string",priority=1,JSONPath=".spec.controlPlaneEndpoint.host",description="Control Plane Endpoint"
-// +kubebuilder:printcolumn:name="MachinePools",type="string",priority=1,JSONPath=".spec.defaultPoolRef.name",description="GCPManagedMachinePool linked to this control plane"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
 // +kubebuilder:printcolumn:name="ProviderStatus",type="string",JSONPath=".status.providerStatus",description="Provider status"
 

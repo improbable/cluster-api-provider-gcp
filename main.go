@@ -60,7 +60,6 @@ var (
 	syncPeriod                        time.Duration
 	webhookPort                       int
 	healthAddr                        string
-
 )
 
 func init() {

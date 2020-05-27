@@ -36,26 +36,23 @@ import (
 )
 
 // ReconcileGKECluster creates the GKE cluster if it doesn't exist
-func (s *Service) ReconcileGKECluster() error {
-	ctx := context.Background()
-
+func (s *Service) ReconcileGKECluster(ctx context.Context) error {
 	// Reconcile GKE cluster
-	spec := s.getGKESpec()
-	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		s.scope.Logger.Info("GKE cluster not found, creating")
 		op, err := s.clusters.Create(s.scope.LocationRelativeName(), &container.CreateClusterRequest{
-			Cluster: spec,
-		}).Do()
+			Cluster: s.getGKESpec(),
+		}).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to create cluster")
 		}
 		s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-		if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+		if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
 			return errors.Wrapf(err, "failed to create cluster")
 		}
 		s.scope.Logger.Info("Operation done", "op", op.Name)
-		cluster, err = s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+		cluster, err = s.clusters.Get(s.scope.ClusterRelativeName()).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe cluster")
 		}
@@ -76,7 +73,7 @@ func (s *Service) ReconcileGKECluster() error {
 		}
 	}
 
-	if err := s.scope.Client.Patch(context.TODO(), s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
+	if err := s.scope.Client.Patch(ctx, s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
 		return errors.Wrapf(err, "failed to set control plane endpoint")
 	}
 
@@ -125,10 +122,10 @@ func (s *Service) ReconcileGKECluster() error {
 	return nil
 }
 
-func (s *Service) DeleteGKECluster() error {
+func (s *Service) DeleteGKECluster(ctx context.Context) error {
 	// TODO: might need to clean up more resources than just the cluster
 
-	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
@@ -137,16 +134,16 @@ func (s *Service) DeleteGKECluster() error {
 		s.scope.Logger.Info("cluster-api-tag label does not match expected label, skipping deletion")
 		return nil
 	}
-	op, err := s.clusters.Delete(s.scope.ClusterRelativeName()).Do()
+	op, err := s.clusters.Delete(s.scope.ClusterRelativeName()).Context(ctx).Do()
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete cluster")
 	}
 	s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-	if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+	if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
 		return errors.Wrapf(err, "failed to delete cluster")
 	}
 	s.scope.Logger.Info("Operation done", "op", op.Name)
-	_, err = s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+	_, err = s.clusters.Get(s.scope.ClusterRelativeName()).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
@@ -183,6 +180,7 @@ func (s *Service) getGKESpec() *container.Cluster {
 	if cluster.ResourceLabels == nil {
 		cluster.ResourceLabels = make(map[string]string)
 	}
+	// Label the cluster to indicate ownership
 	cluster.ResourceLabels["cluster-api-tag"] = infrav1.ClusterTagKey(s.scope.Name())
 
 	return cluster
