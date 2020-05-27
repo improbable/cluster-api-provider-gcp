@@ -1,0 +1,4 @@
+domain: exp.infrastructure.x-k8s.io
+repo: sigs.k8s.io/cluster-api-provider-gcp/exp
+version: "2"
+

@@ -21,7 +21,10 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	infrav1controllersexp "sigs.k8s.io/cluster-api-provider-gcp/exp/controllers"
+	"sigs.k8s.io/cluster-api-provider-gcp/feature"
 	clusterv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
+	capifeature "sigs.k8s.io/cluster-api/feature"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -196,19 +199,21 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "GCPCluster")
 			os.Exit(1)
 		}
-		if err = (&controllers.GCPManagedClusterReconciler{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedCluster"),
-		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedClusterConcurrency}); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "GCPManagedCluster")
-			os.Exit(1)
-		}
-		if err = (&controllers.GCPManagedControlPlaneReconciler{
-			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedControlPlane"),
-		}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedControlPlaneConcurrency}); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "GCPManagedControlPlane")
-			os.Exit(1)
+		if feature.Gates.Enabled(capifeature.MachinePool) && feature.Gates.Enabled(feature.GKE) {
+			if err = (&infrav1controllersexp.GCPManagedClusterReconciler{
+				Client: mgr.GetClient(),
+				Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedCluster"),
+			}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedClusterConcurrency}); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "GCPManagedCluster")
+				os.Exit(1)
+			}
+			if err = (&infrav1controllersexp.GCPManagedControlPlaneReconciler{
+				Client: mgr.GetClient(),
+				Log:    ctrl.Log.WithName("controllers").WithName("GCPManagedControlPlane"),
+			}).SetupWithManager(mgr, controller.Options{MaxConcurrentReconciles: gcpManagedControlPlaneConcurrency}); err != nil {
+				setupLog.Error(err, "unable to create controller", "controller", "GCPManagedControlPlane")
+				os.Exit(1)
+			}
 		}
 	} else {
 		if err = (&infrav1.GCPMachineTemplate{}).SetupWebhookWithManager(mgr); err != nil {

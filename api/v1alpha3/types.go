@@ -102,18 +102,6 @@ type NetworkSpec struct {
 	LoadBalancerBackendPort *int32 `json:"loadBalancerBackendPort,omitempty"`
 }
 
-type ManagedNetworkSpec struct {
-	// Name is the name of the network to be used.
-	// If empty, defaults to the default network.
-	// +optional
-	Name *string `json:"name,omitempty"`
-
-	// Subnetwork is the name of the subnetwork to be used.
-	// If empty, an automatic name will be used.
-	// +optional
-	Subnetwork *string `json:"subnetwork,omitempty"`
-}
-
 // SubnetSpec configures an GCP Subnet.
 type SubnetSpec struct {
 	// Name defines a unique identifier to reference this resource.

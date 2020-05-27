@@ -21,9 +21,9 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
+	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,12 +41,12 @@ type GCPManagedControlPlaneReconciler struct {
 func (r *GCPManagedControlPlaneReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
-		For(&infrav1.GCPManagedControlPlane{}).
+		For(&infrav1exp.GCPManagedControlPlane{}).
 		Complete(r)
 }
 
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=gcpmanagedcontrolplanes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=gcpmanagedcontrolplanes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedcontrolplanes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedcontrolplanes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
 
 func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
@@ -54,7 +54,7 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 	log := r.Log.WithValues("namespace", req.Namespace, "gcpManagedControlPlane", req.Name)
 
 	// Fetch the GCPManagedControlPlane instance
-	gcpControlPlane := &infrav1.GCPManagedControlPlane{}
+	gcpControlPlane := &infrav1exp.GCPManagedControlPlane{}
 	err := r.Get(ctx, req.NamespacedName, gcpControlPlane)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -79,7 +79,7 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 		Name:      gcpControlPlane.Spec.DefaultPoolRef.Name,
 		Namespace: gcpControlPlane.Namespace,
 	}
-	defaultPool := &infrav1.GCPManagedMachinePool{}
+	defaultPool := &infrav1exp.GCPManagedMachinePool{}
 	if err := r.Client.Get(ctx, defaultPoolKey, defaultPool); err != nil {
 		return reconcile.Result{}, errors.Wrapf(err, "failed to fetch default pool reference")
 	}
@@ -142,7 +142,7 @@ func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, 
 	scope.Info("Reconciling GCPManagedControlPlane")
 
 	// If the GCPManagedControlPlane doesn't have our finalizer, add it.
-	controllerutil.AddFinalizer(scope.ControlPlane, infrav1.ManagedControlPlaneFinalizer)
+	controllerutil.AddFinalizer(scope.ControlPlane, infrav1exp.ManagedControlPlaneFinalizer)
 	// Register the finalizer immediately to avoid orphaning GCP resources on delete
 	if err := scope.PatchObject(ctx); err != nil {
 		return reconcile.Result{}, err

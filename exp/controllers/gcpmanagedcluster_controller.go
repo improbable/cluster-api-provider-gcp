@@ -22,8 +22,10 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
+	"sigs.k8s.io/cluster-api-provider-gcp/controllers"
+	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
+	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -40,12 +42,12 @@ type GCPManagedClusterReconciler struct {
 func (r *GCPManagedClusterReconciler) SetupWithManager(mgr ctrl.Manager, options controller.Options) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(options).
-		For(&infrav1.GCPManagedCluster{}).
+		For(&infrav1exp.GCPManagedCluster{}).
 		Complete(r)
 }
 
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=gcpmanagedclusters,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=infrastructure.cluster.x-k8s.io,resources=gcpmanagedclusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedclusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedclusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch
 
 func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
@@ -53,7 +55,7 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 	log := r.Log.WithValues("namespace", req.Namespace, "gcpManagedCluster", req.Name)
 
 	// Fetch the GCPManagedCluster instance
-	gcpCluster := &infrav1.GCPManagedCluster{}
+	gcpCluster := &infrav1exp.GCPManagedCluster{}
 	err := r.Get(ctx, req.NamespacedName, gcpCluster)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -68,17 +70,17 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 		return ctrl.Result{}, err
 	}
 
-	if isPaused(cluster, gcpCluster) {
-		log.Info("GCPManagedCluster of linked Cluster is marked as paused. Won't reconcile")
-		return ctrl.Result{}, nil
-	}
-
 	if cluster == nil {
 		log.Info("Cluster Controller has not yet set OwnerRef")
 		return ctrl.Result{}, nil
 	}
 
-	controlPlane := &infrav1.GCPManagedControlPlane{}
+	if annotations.IsPaused(cluster, gcpCluster) {
+		log.Info("GCPManagedCluster of linked Cluster is marked as paused. Won't reconcile")
+		return ctrl.Result{}, nil
+	}
+
+	controlPlane := &infrav1exp.GCPManagedControlPlane{}
 	controlPlaneRef := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
 		Namespace: cluster.Namespace,

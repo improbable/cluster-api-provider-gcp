@@ -1,0 +1,159 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.6
+  creationTimestamp: null
+  name: gcpmanagedcontrolplanes.exp.infrastructure.cluster.x-k8s.io
+spec:
+  group: exp.infrastructure.cluster.x-k8s.io
+  names:
+    categories:
+    - cluster-api
+    kind: GCPManagedControlPlane
+    listKind: GCPManagedControlPlaneList
+    plural: gcpmanagedcontrolplanes
+    shortNames:
+    - gmcp
+    singular: gcpmanagedcontrolplane
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - description: Cluster to which this GCPManagedControlPlane belongs
+      jsonPath: .metadata.labels.cluster\.x-k8s\.io/cluster-name
+      name: Cluster
+      type: string
+    - description: Control Plane GCP project
+      jsonPath: .spec.project
+      name: Project
+      priority: 1
+      type: string
+    - description: Control Plane region
+      jsonPath: .spec.region
+      name: Region
+      priority: 1
+      type: string
+    - description: Control Plane Endpoint
+      jsonPath: .spec.controlPlaneEndpoint.host
+      name: Endpoint
+      priority: 1
+      type: string
+    - description: GCPManagedMachinePool linked to this control plane
+      jsonPath: .spec.defaultPoolRef.name
+      name: MachinePool
+      priority: 1
+      type: string
+    - description: Cluster infrastructure is ready
+      jsonPath: .status.ready
+      name: Ready
+      type: string
+    name: v1alpha3
+    schema:
+      openAPIV3Schema:
+        description: GCPManagedControlPlane is the Schema for the gcpmanagedcontrolplanes
+          API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: GCPManagedControlPlaneSpec defines the desired state of GCPManagedControlPlane
+            properties:
+              additionalLabels:
+                additionalProperties:
+                  type: string
+                description: AdditionalLabels is an optional set of labels to add
+                  to GCP resources managed by the GCP provider, in addition to the
+                  ones added by default.
+                type: object
+              controlPlaneEndpoint:
+                description: ControlPlaneEndpoint represents the endpoint used to
+                  communicate with the control plane.
+                properties:
+                  host:
+                    description: The hostname on which the API server is serving.
+                    type: string
+                  port:
+                    description: The port on which the API server is serving.
+                    format: int32
+                    type: integer
+                required:
+                - host
+                - port
+                type: object
+              defaultPoolRef:
+                description: DefaultPoolRef is the specification for the default pool,
+                  without which an GKE cluster cannot be created.
+                properties:
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?'
+                    type: string
+                type: object
+              network:
+                description: Network encapsulates all things related to GCP network.
+                properties:
+                  name:
+                    description: Name is the name of the network to be used. If empty,
+                      defaults to the default network.
+                    type: string
+                  subnetwork:
+                    description: Subnetwork is the name of the subnetwork to be used.
+                      If empty, an automatic name will be used.
+                    type: string
+                type: object
+              project:
+                description: Project is the name of the GCP project to start the GKE
+                  cluster in.
+                type: string
+              region:
+                description: 'Region is a string matching one of the canonical GCP
+                  region names. Examples: "us-central1", "europe-west1".'
+                type: string
+              version:
+                description: Version defines the desired Kubernetes version.
+                minLength: 2
+                pattern: ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)([-0-9a-zA-Z_\.+]*)?$
+                type: string
+            required:
+            - defaultPoolRef
+            - project
+            - region
+            - version
+            type: object
+          status:
+            description: GCPManagedControlPlaneStatus defines the observed state of
+              GCPManagedControlPlane
+            properties:
+              initialized:
+                description: Initialized is true when the the control plane is available
+                  for initial contact. This may occur before the control plane is
+                  fully ready. In the GCPManagedControlPlane implementation, these
+                  are identical.
+                type: boolean
+              ready:
+                description: Ready is true when the provider resource is ready.
+                type: boolean
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

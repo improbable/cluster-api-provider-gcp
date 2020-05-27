@@ -18,7 +18,7 @@ spec:
 # Due to the nature of managed Kubernetes and the control plane implementation,
 # the infrastructure provider for a GKE cluster is basically a no-op.
 # It sets itself to ready as soon as it sees the control plane ready.
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedCluster
 metadata:
   name: "${CLUSTER_NAME}"
@@ -26,7 +26,7 @@ metadata:
 # The control plane abstracts readiness and provisioning of an GKE cluster.
 # Because GKE requires a default pool, this also requires a reference to the
 # default machine pool.
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedControlPlane
 metadata:
   name: "${CLUSTER_NAME}-control-plane"
@@ -65,7 +65,7 @@ spec:
 ---
 # The GCP-specific machine pool implementation drives the configuration of the
 # GKE node.
-apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+apiVersion: exp.infrastructure.cluster.x-k8s.io/v1alpha3
 kind: GCPManagedMachinePool
 metadata:
   name: nodepool0
