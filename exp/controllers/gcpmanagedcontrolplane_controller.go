@@ -21,10 +21,10 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
+	capiv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,41 +75,36 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 		return ctrl.Result{}, nil
 	}
 
-	// fetch default pool
-	defaultPoolKey := client.ObjectKey{
-		Name:      gcpControlPlane.Spec.DefaultPoolRef.Name,
-		Namespace: gcpControlPlane.Namespace,
-	}
-	defaultPool := &infrav1exp.GCPManagedMachinePool{}
-	if err := r.Client.Get(ctx, defaultPoolKey, defaultPool); err != nil {
-		return reconcile.Result{}, errors.Wrapf(err, "failed to fetch default pool reference")
+	allMachinePoolList := &capiv1exp.MachinePoolList{}
+	if err = r.Client.List(ctx, allMachinePoolList, client.InNamespace(req.Namespace)); err != nil {
+		return reconcile.Result{}, errors.Wrapf(err, "failed to fetch machine pools")
 	}
 
-	log = log.WithValues("gcpManagedMachinePool", defaultPoolKey.Name)
-
-	// fetch owner of default pool
-	// TODO(ace): create a helper in util for this
-	// Fetch the owning MachinePool.
-	ownerPool, err := getOwnerMachinePool(ctx, r.Client, defaultPool.ObjectMeta)
-	if err != nil {
-		return reconcile.Result{}, err
+	machinePools := make(map[string]*capiv1exp.MachinePool)
+	infraMachinePools := make(map[string]*infrav1exp.GCPManagedMachinePool)
+	for _, machinePool := range allMachinePoolList.Items {
+		machinePoolCopy := machinePool
+		if machinePoolCopy.Spec.ClusterName == cluster.Name {
+			machinePools[machinePoolCopy.Name] = &machinePoolCopy
+			infraRef := machinePoolCopy.Spec.Template.Spec.InfrastructureRef
+			key := client.ObjectKey{Name: infraRef.Name, Namespace: infraRef.Namespace}
+			infraMachinePool := &infrav1exp.GCPManagedMachinePool{}
+			if err = r.Client.Get(ctx, key, infraMachinePool); err != nil {
+				return reconcile.Result{}, errors.Wrapf(err, "failed to fetch infra machine pool")
+			}
+			infraMachinePools[machinePoolCopy.Name] = infraMachinePool
+		}
 	}
-	if ownerPool == nil {
-		log.Info("failed to fetch owner ref for default pool")
-		return reconcile.Result{}, nil
-	}
-
-	log = log.WithValues("machinePool", ownerPool.Name)
 
 	// Create the scope.
 	mcpScope, err := scope.NewManagedControlPlaneScope(scope.ManagedControlPlaneScopeParams{
-		Client:           r.Client,
-		Logger:           log,
-		Cluster:          cluster,
-		ControlPlane:     gcpControlPlane,
-		MachinePool:      ownerPool,
-		InfraMachinePool: defaultPool,
-		PatchTarget:      gcpControlPlane,
+		Client:            r.Client,
+		Logger:            log,
+		Cluster:           cluster,
+		ControlPlane:      gcpControlPlane,
+		MachinePools:      machinePools,
+		InfraMachinePools: infraMachinePools,
+		PatchTarget:       gcpControlPlane,
 	})
 	if err != nil {
 		return reconcile.Result{}, errors.Errorf("failed to create scope: %+v", err)
@@ -134,7 +129,6 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (_ ctrl.R
 func (r *GCPManagedControlPlaneReconciler) reconcileDelete(ctx context.Context, scope *scope.ManagedControlPlaneScope) (ctrl.Result, error) {
 	scope.Info("Handling deleted GCPManagedControlPlane")
 
-	// TODO: Delete GKE cluster
 	computeSvc := managedcompute.NewService(scope)
 
 	if err := computeSvc.DeleteGKECluster(); err != nil {
@@ -146,7 +140,7 @@ func (r *GCPManagedControlPlaneReconciler) reconcileDelete(ctx context.Context, 
 	}
 
 	// Cluster is deleted so remove the finalizer.
-	controllerutil.RemoveFinalizer(scope.ControlPlane, infrav1.ClusterFinalizer)
+	controllerutil.RemoveFinalizer(scope.ControlPlane, infrav1exp.ManagedControlPlaneFinalizer)
 
 	return ctrl.Result{}, nil
 }

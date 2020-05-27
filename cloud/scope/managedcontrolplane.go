@@ -35,13 +35,13 @@ import (
 // ManagedControlPlaneScopeParams defines the input parameters used to create a new Scope.
 type ManagedControlPlaneScopeParams struct {
 	GCPClients
-	Client           client.Client
-	Logger           logr.Logger
-	Cluster          *clusterv1.Cluster
-	ControlPlane     *infrav1.GCPManagedControlPlane
-	InfraMachinePool *infrav1.GCPManagedMachinePool
-	MachinePool      *expv1.MachinePool
-	PatchTarget      runtime.Object
+	Client            client.Client
+	Logger            logr.Logger
+	Cluster           *clusterv1.Cluster
+	ControlPlane      *infrav1.GCPManagedControlPlane
+	InfraMachinePools map[string]*infrav1.GCPManagedMachinePool
+	MachinePools      map[string]*expv1.MachinePool
+	PatchTarget       runtime.Object
 }
 
 // NewManagedControlPlaneScope creates a new Scope from the supplied parameters.
@@ -81,15 +81,15 @@ func NewManagedControlPlaneScope(params ManagedControlPlaneScopeParams) (*Manage
 		return nil, errors.Wrap(err, "failed to init patch helper")
 	}
 	return &ManagedControlPlaneScope{
-		Logger:           params.Logger,
-		Client:           params.Client,
-		GCPClients:       params.GCPClients,
-		Cluster:          params.Cluster,
-		ControlPlane:     params.ControlPlane,
-		InfraMachinePool: params.InfraMachinePool,
-		MachinePool:      params.MachinePool,
-		PatchTarget:      params.PatchTarget,
-		patchHelper:      helper,
+		Logger:            params.Logger,
+		Client:            params.Client,
+		GCPClients:        params.GCPClients,
+		Cluster:           params.Cluster,
+		ControlPlane:      params.ControlPlane,
+		InfraMachinePools: params.InfraMachinePools,
+		MachinePools:      params.MachinePools,
+		PatchTarget:       params.PatchTarget,
+		patchHelper:       helper,
 	}, nil
 }
 
@@ -100,11 +100,11 @@ type ManagedControlPlaneScope struct {
 	patchHelper *patch.Helper
 
 	GCPClients
-	Cluster          *clusterv1.Cluster
-	ControlPlane     *infrav1.GCPManagedControlPlane
-	InfraMachinePool *infrav1.GCPManagedMachinePool
-	MachinePool      *expv1.MachinePool
-	PatchTarget      runtime.Object
+	Cluster           *clusterv1.Cluster
+	ControlPlane      *infrav1.GCPManagedControlPlane
+	InfraMachinePools map[string]*infrav1.GCPManagedMachinePool
+	MachinePools      map[string]*expv1.MachinePool
+	PatchTarget       runtime.Object
 }
 
 // PatchObject persists the cluster configuration and status.
@@ -155,13 +155,13 @@ func (s *ManagedControlPlaneScope) ClusterRelativeName() string {
 	return fmt.Sprintf("%s/clusters/%s", s.LocationRelativeName(), s.ControlPlane.Name)
 }
 
-func (s *ManagedControlPlaneScope) NodePoolRelativeName() string {
-	return fmt.Sprintf("%s/nodePools/%s", s.ClusterRelativeName(), s.InfraMachinePool.Name)
+func (s *ManagedControlPlaneScope) NodePoolRelativeName(machinePoolName string) string {
+	return fmt.Sprintf("%s/nodePools/%s", s.ClusterRelativeName(), s.InfraMachinePools[machinePoolName].Name)
 }
 
-func (s *ManagedControlPlaneScope) DefaultNodePoolReplicaCount() int64 {
-	if s.MachinePool.Spec.Replicas == nil {
+func (s *ManagedControlPlaneScope) NodePoolReplicaCount(machinePoolName string) int64 {
+	if s.MachinePools[machinePoolName].Spec.Replicas == nil {
 		return 1
 	}
-	return int64(*s.MachinePool.Spec.Replicas)
+	return int64(*s.MachinePools[machinePoolName].Spec.Replicas)
 }

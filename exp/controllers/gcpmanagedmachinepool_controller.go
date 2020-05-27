@@ -51,7 +51,7 @@ func (r *GCPManagedMachinePoolReconciler) SetupWithManager(mgr ctrl.Manager, opt
 // +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedmachinepools,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=exp.infrastructure.cluster.x-k8s.io,resources=gcpmanagedmachinepools/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters;clusters/status,verbs=get;list;watch;patch
-// +kubebuilder:rbac:groups=exp.cluster.x-k8s.io,resources=machinepools;machinepools/status,verbs=get;list;watch
+// +kubebuilder:rbac:groups=exp.cluster.x-k8s.io,resources=machinepools;machinepools/status,verbs=get;list;watch;patch
 
 func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result, reterr error) {
 	ctx := context.TODO()
@@ -69,7 +69,14 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Re
 
 	// Fetch the owning MachinePool.
 	ownerPool, err := getOwnerMachinePool(ctx, r.Client, infraPool.ObjectMeta)
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		log.Info("Owner machine pool not found - assuming machine deleted. Removing finalizer from infra machine pool.")
+		patch := client.MergeFrom(infraPool.DeepCopy())
+		controllerutil.RemoveFinalizer(infraPool, infrav1.ClusterFinalizer)
+		if err := r.Client.Patch(ctx, infraPool, patch); err != nil {
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
 		return reconcile.Result{}, err
 	}
 	if ownerPool == nil {
@@ -79,7 +86,14 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Re
 
 	// Fetch the Cluster.
 	ownerCluster, err := util.GetOwnerCluster(ctx, r.Client, ownerPool.ObjectMeta)
-	if err != nil {
+	if apierrors.IsNotFound(err) {
+		log.Info("Owner cluster not found - assuming cluster deleted. Removing finalizer from owner machine pool.")
+		patch := client.MergeFrom(ownerPool.DeepCopy())
+		controllerutil.RemoveFinalizer(ownerPool, capiv1exp.MachinePoolFinalizer)
+		if err := r.Client.Patch(ctx, ownerPool, patch); err != nil {
+			return reconcile.Result{}, err
+		}
+	} else if err != nil {
 		return reconcile.Result{}, err
 	}
 	if ownerCluster == nil {
@@ -101,13 +115,13 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Re
 
 	// Create the scope.
 	mcpScope, err := scope.NewManagedControlPlaneScope(scope.ManagedControlPlaneScopeParams{
-		Client:           r.Client,
-		Logger:           log,
-		ControlPlane:     controlPlane,
-		Cluster:          ownerCluster,
-		MachinePool:      ownerPool,
-		InfraMachinePool: infraPool,
-		PatchTarget:      infraPool,
+		Client:            r.Client,
+		Logger:            log,
+		ControlPlane:      controlPlane,
+		Cluster:           ownerCluster,
+		MachinePools:      map[string]*capiv1exp.MachinePool{"default": ownerPool},
+		InfraMachinePools: map[string]*infrav1exp.GCPManagedMachinePool{"default": infraPool},
+		PatchTarget:       infraPool,
 	})
 	if err != nil {
 		return reconcile.Result{}, errors.Errorf("failed to create scope: %+v", err)
@@ -126,11 +140,20 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (_ ctrl.Re
 
 	// Handle non-deleted machine pool
 	return r.reconcileNormal(ctx, mcpScope)
-
 }
 
 func (r *GCPManagedMachinePoolReconciler) reconcileDelete(ctx context.Context, scope *scope.ManagedControlPlaneScope) (ctrl.Result, error) {
-	// TODO: Implement delete
+	scope.Info("Handling deleted GCPManagedMachinePool")
+
+	computeSvc := managedcompute.NewService(scope)
+
+	if err := computeSvc.DeleteGKENodePool(); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to delete GKE nodepool for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
+	}
+
+	// Node pool is deleted so remove the finalizer.
+	controllerutil.RemoveFinalizer(scope.InfraMachinePools["default"], infrav1.ClusterFinalizer)
+
 	return ctrl.Result{}, nil
 }
 
@@ -138,7 +161,7 @@ func (r *GCPManagedMachinePoolReconciler) reconcileNormal(ctx context.Context, s
 	scope.Logger.Info("Reconciling GCPManagedMachinePool")
 
 	// If the GCPManagedMachinePool doesn't have our finalizer, add it.
-	controllerutil.AddFinalizer(scope.InfraMachinePool, infrav1.ClusterFinalizer)
+	controllerutil.AddFinalizer(scope.InfraMachinePools["default"], infrav1.ClusterFinalizer)
 	// Register the finalizer immediately to avoid orphaning GCP resources on delete
 	if err := scope.PatchObject(ctx); err != nil {
 		return reconcile.Result{}, err
@@ -151,11 +174,12 @@ func (r *GCPManagedMachinePoolReconciler) reconcileNormal(ctx context.Context, s
 	computeSvc := managedcompute.NewService(scope)
 
 	if err := computeSvc.ReconcileGKENodePool(); err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE node pool for GCPManagedMachinePool %s/%s", scope.InfraMachinePool.Namespace, scope.InfraMachinePool.Name)
+		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE node pool for GCPManagedMachinePool %s/%s",
+			scope.InfraMachinePools["default"].Namespace, scope.InfraMachinePools["default"].Name)
 	}
 
 	// No errors, so mark us ready so the Cluster API Cluster Controller can pull it
-	scope.InfraMachinePool.Status.Ready = true
+	scope.InfraMachinePools["default"].Status.Ready = true
 
 	return reconcile.Result{}, nil
 }

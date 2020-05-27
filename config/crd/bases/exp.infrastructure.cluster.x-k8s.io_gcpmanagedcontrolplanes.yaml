@@ -42,7 +42,7 @@ spec:
       type: string
     - description: GCPManagedMachinePool linked to this control plane
       jsonPath: .spec.defaultPoolRef.name
-      name: MachinePool
+      name: MachinePools
       priority: 1
       type: string
     - description: Cluster infrastructure is ready

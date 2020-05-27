@@ -34,9 +34,11 @@ func (s *Service) ReconcileNetwork() error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to create network")
 		}
+		s.scope.Logger.Info("Waiting for operation", "op", op.Name)
 		if err := wait.ForComputeOperation(s.scope.Compute, s.scope.Project(), op); err != nil {
 			return errors.Wrapf(err, "failed to create network")
 		}
+		s.scope.Logger.Info("Operation done", "op", op.Name)
 		_, err = s.networks.Get(s.scope.Project(), spec.Name).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe network")
@@ -78,9 +80,11 @@ func (s *Service) DeleteNetwork() error {
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete forwarding rules")
 	}
+	s.scope.Logger.Info("Waiting for operation", "op", op.Name)
 	if err := wait.ForComputeOperation(s.scope.Compute, s.scope.Project(), op); err != nil {
-		return errors.Wrapf(err, "failed to delete forwarding rules")
+		return errors.Wrapf(err, "failed to delete network")
 	}
+	s.scope.Logger.Info("Operation done", "op", op.Name)
 	s.scope.ControlPlane.Spec.Network.Name = nil
 	return nil
 }

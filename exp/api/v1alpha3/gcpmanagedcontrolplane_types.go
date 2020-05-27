@@ -83,7 +83,7 @@ type GCPManagedControlPlaneStatus struct {
 // +kubebuilder:printcolumn:name="Project",type="string",priority=1,JSONPath=".spec.project",description="Control Plane GCP project"
 // +kubebuilder:printcolumn:name="Region",type="string",priority=1,JSONPath=".spec.region",description="Control Plane region"
 // +kubebuilder:printcolumn:name="Endpoint",type="string",priority=1,JSONPath=".spec.controlPlaneEndpoint.host",description="Control Plane Endpoint"
-// +kubebuilder:printcolumn:name="MachinePool",type="string",priority=1,JSONPath=".spec.defaultPoolRef.name",description="GCPManagedMachinePool linked to this control plane"
+// +kubebuilder:printcolumn:name="MachinePools",type="string",priority=1,JSONPath=".spec.defaultPoolRef.name",description="GCPManagedMachinePool linked to this control plane"
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
 // +kubebuilder:printcolumn:name="ProviderStatus",type="string",JSONPath=".status.providerStatus",description="Provider status"
 

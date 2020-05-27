@@ -20,7 +20,16 @@ spec:
     singular: gcpmanagedmachinepool
   scope: Namespaced
   versions:
-  - name: v1alpha3
+  - additionalPrinterColumns:
+    - description: Cluster infrastructure is ready
+      jsonPath: .status.ready
+      name: Ready
+      type: string
+    - description: Provider status
+      jsonPath: .status.providerStatus
+      name: ProviderStatus
+      type: string
+    name: v1alpha3
     schema:
       openAPIV3Schema:
         description: GCPManagedMachinePool is the Schema for the gcpmanagedmachinepools

@@ -56,6 +56,7 @@ rules:
   verbs:
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - exp.infrastructure.cluster.x-k8s.io

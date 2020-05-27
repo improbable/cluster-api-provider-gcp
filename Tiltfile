@@ -164,7 +164,7 @@ def capg():
     local_resource(
         "manager",
         cmd = 'mkdir -p .tiltbuild;CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags \'-extldflags "-static"\' -o .tiltbuild/manager',
-        deps = ["./api", "./main.go", "./pkg", "./controllers", "./cloud"]
+        deps = ["./api", "./main.go", "./pkg", "./controllers", "./cloud", "./exp"]
     )
 
     dockerfile_contents = "\n".join([
