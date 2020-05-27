@@ -78,6 +78,10 @@ spec:
                   of Machines can be added as events to the Machine object and/or
                   logged in the controller's output.
                 type: string
+              providerStatus:
+                description: ProviderStatus is the status of the node pool as reported
+                  by GKE
+                type: string
               ready:
                 description: Ready is true when the provider resource is ready.
                 type: boolean

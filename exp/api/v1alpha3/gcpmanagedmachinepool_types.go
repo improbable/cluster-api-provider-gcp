@@ -69,12 +69,18 @@ type GCPManagedMachinePoolStatus struct {
 	// controller's output.
 	// +optional
 	ErrorMessage *string `json:"errorMessage,omitempty"`
+
+	// ProviderStatus is the status of the node pool as reported by GKE
+	// +optional
+	ProviderStatus string `json:"providerStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=gcpmanagedmachinepools,scope=Namespaced,categories=cluster-api,shortName=gmmp
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
+// +kubebuilder:printcolumn:name="ProviderStatus",type="string",JSONPath=".status.providerStatus",description="Provider status"
 
 // GCPManagedMachinePool is the Schema for the gcpmanagedmachinepools API
 type GCPManagedMachinePool struct {

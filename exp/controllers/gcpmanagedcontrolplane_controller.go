@@ -21,6 +21,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
@@ -134,6 +135,18 @@ func (r *GCPManagedControlPlaneReconciler) reconcileDelete(ctx context.Context, 
 	scope.Info("Handling deleted GCPManagedControlPlane")
 
 	// TODO: Delete GKE cluster
+	computeSvc := managedcompute.NewService(scope)
+
+	if err := computeSvc.DeleteGKECluster(); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to delete GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
+	}
+
+	if err := computeSvc.DeleteNetwork(); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to delete network for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
+	}
+
+	// Cluster is deleted so remove the finalizer.
+	controllerutil.RemoveFinalizer(scope.ControlPlane, infrav1.ClusterFinalizer)
 
 	return ctrl.Result{}, nil
 }

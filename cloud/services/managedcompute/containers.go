@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/utils/pointer"
+	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
@@ -122,6 +124,33 @@ func (s *Service) ReconcileGKECluster() error {
 	return nil
 }
 
+func (s *Service) DeleteGKECluster() error {
+	// TODO: might need to clean up more resources than just the cluster
+
+	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+	if gcperrors.IsNotFound(err) {
+		return nil
+	}
+	// Return early if we don't own the cluster
+	if tag, exists := cluster.ResourceLabels["cluster-api-tag"]; !exists || tag != infrav1.ClusterTagKey(s.scope.Name()) {
+		s.scope.Logger.Info("cluster-api-tag label does not match expected label, skipping deletion")
+		return nil
+	}
+	op, err := s.clusters.Delete(s.scope.ClusterRelativeName()).Do()
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete cluster")
+	}
+	if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+		return errors.Wrapf(err, "failed to delete cluster")
+	}
+	_, err = s.clusters.Get(s.scope.ClusterRelativeName()).Do()
+	if gcperrors.IsNotFound(err) {
+		return nil
+	}
+
+	return errors.New("failed to delete cluster")
+}
+
 func (s *Service) getGKESpec() *container.Cluster {
 	cluster := &container.Cluster{
 		InitialClusterVersion: s.scope.KubernetesVersion(),
@@ -141,11 +170,19 @@ func (s *Service) getGKESpec() *container.Cluster {
 			Enabled:  true,
 			Provider: "CALICO",
 		},
+		// TODO: We should specify all the node pools available at creation to prevent potential master scaling and
+		// increasing provision times.
+		// https://github.com/scylladb/scylla-operator/issues/9#issuecomment-478262197
 		NodePools: []*container.NodePool{
 			s.getNodePoolSpec(),
 		},
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
 	}
+
+	if cluster.ResourceLabels == nil {
+		cluster.ResourceLabels = make(map[string]string)
+	}
+	cluster.ResourceLabels["cluster-api-tag"] = infrav1.ClusterTagKey(s.scope.Name())
 
 	return cluster
 }
@@ -171,6 +208,44 @@ func (s *Service) getNodePoolConfig() *container.NodeConfig {
 		Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
 	}
 }
+
+func (s *Service) ReconcileGKENodePool() error {
+	// Get node pool to check for existence
+	nodePool, err := s.nodepools.Get(s.scope.NodePoolRelativeName()).Do()
+	// Create node pool if it does not exist
+	if gcperrors.IsNotFound(err) {
+		s.scope.Logger.Info("Node pool not found, creating")
+		op, err := s.nodepools.Create(s.scope.ClusterRelativeName(), &container.CreateNodePoolRequest{
+			NodePool: s.getNodePoolSpec(),
+		}).Do()
+		if err != nil {
+			return errors.Wrapf(err, "failed to create node pool")
+		}
+		if err := wait.ForContainerOperation(s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
+			return errors.Wrapf(err, "failed to create node pool")
+		}
+		nodePool, err = s.nodepools.Get(s.scope.NodePoolRelativeName()).Do()
+		if err != nil {
+			return errors.Wrapf(err, "failed to describe cluster")
+		}
+	}
+	// TODO: Update node pool if it has been modified
+	oldMachinePool := s.scope.InfraMachinePool.DeepCopyObject()
+
+	// Reconcile provider status
+	s.scope.InfraMachinePool.Status.ProviderStatus = nodePool.Status
+	if nodePool.Status == "ERROR" || nodePool.Status == "RUNNING_WITH_ERROR" {
+		s.scope.InfraMachinePool.Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
+	}
+
+	s.scope.Logger.Info("Patching machine pool status")
+	if err := s.scope.Client.Patch(context.TODO(), s.scope.InfraMachinePool, client.MergeFrom(oldMachinePool)); err != nil {
+		return errors.Wrapf(err, "failed to patch infra machine pool")
+	}
+
+	return nil
+}
+
 
 func makeKubeconfig(cluster *clusterv1.Cluster, controlPlane *infrav1exp.GCPManagedControlPlane) *corev1.Secret {
 	return &corev1.Secret{
