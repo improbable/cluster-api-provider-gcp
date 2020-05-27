@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// GCPManagedMachinePoolReconciler reconciles a AzureManagedMachinePool object
+// GCPManagedMachinePoolReconciler reconciles a GCPManagedMachinePool object
 type GCPManagedMachinePoolReconciler struct {
 	client.Client
 	Log logr.Logger

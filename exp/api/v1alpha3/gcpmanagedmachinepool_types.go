@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 const (
 	// ManagedMachinePoolFinalizer allows ReconcileGCPManagedMachinePool to clean up GCP resources associated with #
 	// GCPManagedMachinePool before removing it from the apiserver.
-	ManagedMachinePoolFinalizer = "gcpmanagedmachinepool.infrastructure.cluster.x-k8s.io"
+	ManagedMachinePoolFinalizer = "gcpmanagedmachinepool.exp.infrastructure.cluster.x-k8s.io"
 )
 
 // GCPManagedMachinePoolSpec defines the desired state of GCPManagedMachinePool

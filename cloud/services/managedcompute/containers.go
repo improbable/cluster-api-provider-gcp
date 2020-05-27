@@ -17,16 +17,27 @@ package managedcompute
 
 import (
 	"context"
+	"encoding/base64"
+	"fmt"
 	"github.com/pkg/errors"
 	"google.golang.org/api/container/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
+	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
+	"sigs.k8s.io/cluster-api/util/secret"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ReconcileGKECluster creates the GKE cluster if it doesn't exist
 func (s *Service) ReconcileGKECluster() error {
+	ctx := context.Background()
+
 	// Reconcile GKE cluster
 	spec := s.getGKESpec()
 	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Do()
@@ -49,20 +60,60 @@ func (s *Service) ReconcileGKECluster() error {
 	}
 
 	// Reconcile endpoint
-	oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
-	s.scope.ControlPlane.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
-		Host: cluster.Endpoint,
-		Port: 443,
+	if cluster.Endpoint != "" {
+		oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
+		s.scope.ControlPlane.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
+			Host: cluster.Endpoint,
+			Port: 443,
+		}
+
+		if err := s.scope.Client.Patch(context.TODO(), s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
+			return errors.Wrapf(err, "failed to set control plane endpoint")
+		}
 	}
 
-	if err := s.scope.Client.Patch(context.TODO(), s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
-		return errors.Wrapf(err, "failed to set control plane endpoint")
+	// Reconcile kubeconfig
+	if cluster.Endpoint != "" && cluster.MasterAuth.ClusterCaCertificate != "" && cluster.MasterAuth.Password != "" {
+		clusterCaBytes, err := base64.StdEncoding.DecodeString(cluster.MasterAuth.ClusterCaCertificate)
+		if err != nil {
+			return errors.Wrapf(err, "failed to decode cluster CA certificate")
+		}
+		kubeconfig := clientcmdapi.Config{
+			Clusters: map[string]*clientcmdapi.Cluster{
+				s.scope.ControlPlane.Name: {
+					Server:                   fmt.Sprintf("https://%s", cluster.Endpoint),
+					CertificateAuthorityData: clusterCaBytes,
+				},
+			},
+			AuthInfos: map[string]*clientcmdapi.AuthInfo{
+				s.scope.ControlPlane.Name: {
+					Username: cluster.MasterAuth.Username,
+					Password: cluster.MasterAuth.Password,
+				},
+			},
+			Contexts: map[string]*clientcmdapi.Context{
+				s.scope.ControlPlane.Name: {
+					Cluster: s.scope.ControlPlane.Name,
+					AuthInfo: s.scope.ControlPlane.Name,
+				},
+			},
+			CurrentContext: s.scope.ControlPlane.Name,
+		}
+		configYaml, err := clientcmd.Write(kubeconfig)
+		if err != nil {
+			return errors.Wrapf(err, "failed to write kubeconfig to yaml")
+		}
+		base64ConfigYaml := base64.StdEncoding.EncodeToString(configYaml)
+		kubeconfigSecret := makeKubeconfig(s.scope.Cluster, s.scope.ControlPlane)
+		if _, err := controllerutil.CreateOrUpdate(ctx, s.scope.Client, kubeconfigSecret, func() error {
+			kubeconfigSecret.Data = map[string][]byte{
+				secret.KubeconfigDataName: []byte(base64ConfigYaml),
+			}
+			return nil
+		}); err != nil {
+			return errors.Wrapf(err, "failed to kubeconfig secret for cluster")
+		}
 	}
-
-	// TODO reconcile kubeconfig
-	// Need to figure out the following things:
-	// 1. How to get credentials? Do we want to use HTTP basic auth?
-	// 2. How to generate kubeconfig? API doesn't return one.
 
 	return nil
 }
@@ -75,6 +126,11 @@ func (s *Service) getGKESpec() *container.Cluster {
 			SubnetworkName:   s.scope.SubnetworkName(),
 			UseIpAliases:     true,
 		},
+		MasterAuth: &container.MasterAuth{
+			// Enable HTTP Basic Auth to allow the generation of a kubeconfig that bypasses Google OAuth
+			// GKE client certs are broken and require additional config https://github.com/kubernetes/kubernetes/issues/65400
+			Username: "admin",
+		},
 		Name:    s.scope.ControlPlane.Name,
 		Network: s.scope.NetworkName(),
 		NetworkPolicy: &container.NetworkPolicy{
@@ -82,23 +138,44 @@ func (s *Service) getGKESpec() *container.Cluster {
 			Provider: "CALICO",
 		},
 		NodePools: []*container.NodePool{
-			{
-				Autoscaling: &container.NodePoolAutoscaling{
-					// TODO: autoscaling is currently not supported
-					Enabled: false,
-				},
-				Config: &container.NodeConfig{
-					DiskSizeGb:  s.scope.DefaultNodePoolBootDiskSizeGB(),
-					DiskType:    s.scope.InfraMachinePool.Spec.DiskType,
-					MachineType: s.scope.InfraMachinePool.Spec.InstanceType,
-					Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
-				},
-				InitialNodeCount: s.scope.DefaultNodePoolReplicaCount(),
-				Name:             s.scope.MachinePool.Name,
-			},
+			s.getNodePoolSpec(),
 		},
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
 	}
 
 	return cluster
+}
+
+func (s *Service) getNodePoolSpec() *container.NodePool {
+	return &container.NodePool{
+		Autoscaling: &container.NodePoolAutoscaling{
+			// TODO: autoscaling is currently not supported
+			Enabled: false,
+		},
+		Config: s.getNodePoolConfig(),
+		// For regional clusters, this is the node count per zone
+		InitialNodeCount: s.scope.DefaultNodePoolReplicaCount(),
+		Name:             s.scope.MachinePool.Name,
+	}
+}
+
+func (s *Service) getNodePoolConfig() *container.NodeConfig {
+	return &container.NodeConfig{
+		DiskSizeGb:  s.scope.InfraMachinePool.Spec.BootDiskSizeGB,
+		DiskType:    s.scope.InfraMachinePool.Spec.DiskType,
+		MachineType: s.scope.InfraMachinePool.Spec.InstanceType,
+		Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
+	}
+}
+
+func makeKubeconfig(cluster *clusterv1.Cluster, controlPlane *infrav1exp.GCPManagedControlPlane) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secret.Name(cluster.Name, secret.Kubeconfig),
+			Namespace: cluster.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(controlPlane, infrav1exp.GroupVersion.WithKind("GCPManagedControlPlane")),
+			},
+		},
+	}
 }
