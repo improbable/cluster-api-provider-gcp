@@ -49,3 +49,5 @@ junit.*.xml
 
 # Tilt files.
 .tiltbuild
+/tilt.d
+tilt-settings.json
