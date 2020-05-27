@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -157,6 +157,10 @@ func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, 
 	if err := computeSvc.ReconcileGKECluster(); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
+
+	// No errors, so mark us ready so the Cluster API Cluster Controller can pull it
+	scope.ControlPlane.Status.Ready = true
+	scope.ControlPlane.Status.Initialized = true
 
 	return ctrl.Result{}, nil
 }

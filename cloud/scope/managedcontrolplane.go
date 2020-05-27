@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -165,4 +165,11 @@ func (s *ManagedControlPlaneScope) DefaultNodePoolBootDiskSizeGB() int64 {
 		return 0
 	}
 	return *s.InfraMachinePool.Spec.BootDiskSizeGB
+}
+
+func (s *ManagedControlPlaneScope) DefaultNodePoolReplicaCount() int64 {
+	if s.MachinePool.Spec.Replicas == nil {
+		return 1
+	}
+	return int64(*s.MachinePool.Spec.Replicas)
 }

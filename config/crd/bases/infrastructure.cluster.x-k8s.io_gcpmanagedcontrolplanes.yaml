@@ -20,7 +20,36 @@ spec:
     singular: gcpmanagedcontrolplane
   scope: Namespaced
   versions:
-  - name: v1alpha3
+  - additionalPrinterColumns:
+    - description: Cluster to which this GCPManagedControlPlane belongs
+      jsonPath: .metadata.labels.cluster\.x-k8s\.io/cluster-name
+      name: Cluster
+      type: string
+    - description: Control Plane GCP project
+      jsonPath: .spec.project
+      name: Project
+      priority: 1
+      type: string
+    - description: Control Plane region
+      jsonPath: .spec.region
+      name: Region
+      priority: 1
+      type: string
+    - description: Control Plane Endpoint
+      jsonPath: .spec.controlPlaneEndpoint.host
+      name: Endpoint
+      priority: 1
+      type: string
+    - description: GCPManagedMachinePool linked to this control plane
+      jsonPath: .spec.defaultPoolRef.name
+      name: MachinePool
+      priority: 1
+      type: string
+    - description: Cluster infrastructure is ready
+      jsonPath: .status.ready
+      name: Ready
+      type: string
+    name: v1alpha3
     schema:
       openAPIV3Schema:
         description: GCPManagedControlPlane is the Schema for the gcpmanagedcontrolplanes

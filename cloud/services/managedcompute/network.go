@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2020 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,6 +55,8 @@ func (s *Service) getNetworkSpec() *compute.Network {
 		Name:                  s.scope.NetworkName(),
 		Description:           infrav1.ClusterTagKey(s.scope.Name()),
 		AutoCreateSubnetworks: false,
+		// make sure AutoCreateSubnetworks field is included in request, else this creates a Legacy network
+		ForceSendFields: []string{"AutoCreateSubnetworks"},
 	}
 
 	return res

@@ -75,6 +75,12 @@ type GCPManagedControlPlaneStatus struct {
 // +kubebuilder:resource:path=gcpmanagedcontrolplanes,scope=Namespaced,categories=cluster-api,shortName=gmcp
 // +kubebuilder:storageversion
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Cluster",type="string",JSONPath=".metadata.labels.cluster\\.x-k8s\\.io/cluster-name",description="Cluster to which this GCPManagedControlPlane belongs"
+// +kubebuilder:printcolumn:name="Project",type="string",priority=1,JSONPath=".spec.project",description="Control Plane GCP project"
+// +kubebuilder:printcolumn:name="Region",type="string",priority=1,JSONPath=".spec.region",description="Control Plane region"
+// +kubebuilder:printcolumn:name="Endpoint",type="string",priority=1,JSONPath=".spec.controlPlaneEndpoint.host",description="Control Plane Endpoint"
+// +kubebuilder:printcolumn:name="MachinePool",type="string",priority=1,JSONPath=".spec.defaultPoolRef.name",description="GCPManagedMachinePool linked to this control plane"
+// +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.ready",description="Cluster infrastructure is ready"
 
 // GCPManagedControlPlane is the Schema for the gcpmanagedcontrolplanes API
 type GCPManagedControlPlane struct {

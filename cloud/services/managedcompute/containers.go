@@ -1,10 +1,24 @@
+/*
+Copyright 2020 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
 package managedcompute
 
 import (
 	"context"
 	"github.com/pkg/errors"
 	"google.golang.org/api/container/v1"
-	"net/url"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
@@ -36,12 +50,8 @@ func (s *Service) ReconcileGKECluster() error {
 
 	// Reconcile endpoint
 	oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
-	endpointURL, err := url.Parse(cluster.Endpoint)
-	if err != nil {
-		return errors.Wrapf(err, "failed to parse cluster master endpoint")
-	}
 	s.scope.ControlPlane.Spec.ControlPlaneEndpoint = clusterv1.APIEndpoint{
-		Host: endpointURL.Hostname(),
+		Host: cluster.Endpoint,
 		Port: 443,
 	}
 
@@ -74,10 +84,8 @@ func (s *Service) getGKESpec() *container.Cluster {
 		NodePools: []*container.NodePool{
 			{
 				Autoscaling: &container.NodePoolAutoscaling{
-					// TODO: autoscaling is currently not support
-					Enabled:      false,
-					MaxNodeCount: int64(*s.scope.MachinePool.Spec.Replicas),
-					MinNodeCount: int64(*s.scope.MachinePool.Spec.Replicas),
+					// TODO: autoscaling is currently not supported
+					Enabled: false,
 				},
 				Config: &container.NodeConfig{
 					DiskSizeGb:  s.scope.DefaultNodePoolBootDiskSizeGB(),
@@ -85,11 +93,11 @@ func (s *Service) getGKESpec() *container.Cluster {
 					MachineType: s.scope.InfraMachinePool.Spec.InstanceType,
 					Preemptible: s.scope.InfraMachinePool.Spec.Preemptible,
 				},
-				Name: s.scope.MachinePool.Name,
+				InitialNodeCount: s.scope.DefaultNodePoolReplicaCount(),
+				Name:             s.scope.MachinePool.Name,
 			},
 		},
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
-		Subnetwork:     s.scope.SubnetworkName(),
 	}
 
 	return cluster

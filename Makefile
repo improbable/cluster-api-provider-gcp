@@ -270,17 +270,25 @@ release-notes: $(RELEASE_NOTES)
 
 CLUSTER_NAME ?= test1
 
+.PHONY: kind-create
+kind-create: ## create clusterapi kind cluster if needed
+	./scripts/kind-with-registry.sh
+
+.PHONY: tilt-up
+tilt-up: kind-create ## start tilt and build kind cluster if needed
+	tilt up
+
 .PHONY: create-management-cluster
 create-management-cluster: $(KUSTOMIZE) $(ENVSUBST)
 	## Create kind management cluster.
-	kind create cluster --name=clusterapi
+	$(MAKE) kind-create
 
 	# Install cert manager and wait for availability
 	kubectl create -f https://github.com/jetstack/cert-manager/releases/download/v0.11.1/cert-manager.yaml
 	kubectl wait --for=condition=Available --timeout=5m apiservice v1beta1.webhook.cert-manager.io
 
-	# Deploy CAPI with MachinePool feature gate enabled
-	kubectl apply -f hack/cluster-api-components-with-machinepool.yaml
+	# Deploy CAPI
+	kubectl apply -f https://github.com/kubernetes-sigs/cluster-api/releases/download/v0.3.6/cluster-api-components.yaml
 
 	# Deploy CAPG
 	kind load docker-image $(CONTROLLER_IMG)-$(ARCH):$(TAG) --name=clusterapi
