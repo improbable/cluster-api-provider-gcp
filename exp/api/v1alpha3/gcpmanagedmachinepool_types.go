@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha3
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	capierrors "sigs.k8s.io/cluster-api/errors"
 )
@@ -51,6 +52,14 @@ type GCPManagedMachinePoolSpec struct {
 	// This does not match the cluster-api contract for MachinePool that expects a fixed size.
 	// +optional
 	Autoscaling *AutoscalingSpec `json:"autoscaling,omitempty"`
+
+	// Labels is an optional set of Kubernetes labels to add to the node pool.
+	// +optional
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// Taints specifies the taints the node pool should have.
+	// +optional
+	Taints []v1.Taint `json:"taints,omitempty"`
 }
 
 // GCPManagedMachinePoolStatus defines the observed state of GCPManagedMachinePool

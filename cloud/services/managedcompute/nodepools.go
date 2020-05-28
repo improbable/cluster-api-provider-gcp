@@ -153,10 +153,20 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 }
 
 func (s *Service) getNodePoolConfig(machinePoolName string) *container.NodeConfig {
+	var gcpTaints []*container.NodeTaint
+	for _, taint := range s.scope.InfraMachinePools[machinePoolName].Spec.Taints {
+		gcpTaints = append(gcpTaints, &container.NodeTaint{
+			Effect: string(taint.Effect),
+			Key: taint.Key,
+			Value: taint.Value,
+		})
+	}
 	return &container.NodeConfig{
 		DiskSizeGb:  s.scope.InfraMachinePools[machinePoolName].Spec.BootDiskSizeGB,
 		DiskType:    s.scope.InfraMachinePools[machinePoolName].Spec.DiskType,
 		MachineType: s.scope.InfraMachinePools[machinePoolName].Spec.InstanceType,
 		Preemptible: s.scope.InfraMachinePools[machinePoolName].Spec.Preemptible,
+		Labels:      s.scope.InfraMachinePools[machinePoolName].Spec.Labels,
+		Taints:      gcpTaints,
 	}
 }
