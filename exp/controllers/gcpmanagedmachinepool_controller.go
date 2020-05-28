@@ -22,7 +22,6 @@ import (
 	"github.com/pkg/errors"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	infrav1 "sigs.k8s.io/cluster-api-provider-gcp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
@@ -79,7 +78,7 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (result ct
 		// https://github.com/kubernetes-sigs/cluster-api/issues/2952
 		log.Info("Owner machine pool not found, assuming it's deleted. Removing finalizer from infra machine pool.")
 		patch := client.MergeFrom(infraPool.DeepCopy())
-		controllerutil.RemoveFinalizer(infraPool, infrav1.ClusterFinalizer)
+		controllerutil.RemoveFinalizer(infraPool, infrav1exp.ManagedMachinePoolFinalizer)
 		if err := r.Client.Patch(ctx, infraPool, patch); err != nil {
 			return ctrl.Result{}, err
 		}
