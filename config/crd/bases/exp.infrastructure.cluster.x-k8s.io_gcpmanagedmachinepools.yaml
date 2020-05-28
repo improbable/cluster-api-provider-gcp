@@ -21,6 +21,10 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - description: Cluster to which this GCPManagedMachinePool belongs
+      jsonPath: .metadata.labels.cluster\.x-k8s\.io/cluster-name
+      name: Cluster
+      type: string
     - description: Cluster infrastructure is ready
       jsonPath: .status.ready
       name: Ready

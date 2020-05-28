@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/scope"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/services/managedcompute"
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
+	capiv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	capiv1exp "sigs.k8s.io/cluster-api/exp/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -79,25 +80,34 @@ func (r *GCPManagedControlPlaneReconciler) Reconcile(req ctrl.Request) (result c
 		return ctrl.Result{}, nil
 	}
 
+	// Find all MachinePools for this cluster
+	labels := map[string]string{capiv1.ClusterLabelName: cluster.Name}
 	allMachinePoolList := &capiv1exp.MachinePoolList{}
-	if err = r.Client.List(ctx, allMachinePoolList, client.InNamespace(req.Namespace)); err != nil {
+	if err = r.Client.List(ctx, allMachinePoolList, client.InNamespace(req.Namespace), client.MatchingLabels(labels)); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to fetch machine pools")
 	}
 
+	// Find the corresponding GCPManagedMachinePools for each MachinePool
+	defaultPoolFound := false
 	machinePools := make(map[string]*capiv1exp.MachinePool)
 	infraMachinePools := make(map[string]*infrav1exp.GCPManagedMachinePool)
 	for _, machinePool := range allMachinePoolList.Items {
 		machinePoolCopy := machinePool
-		if machinePoolCopy.Spec.ClusterName == cluster.Name {
-			machinePools[machinePoolCopy.Name] = &machinePoolCopy
-			infraRef := machinePoolCopy.Spec.Template.Spec.InfrastructureRef
-			key := client.ObjectKey{Name: infraRef.Name, Namespace: infraRef.Namespace}
-			infraMachinePool := &infrav1exp.GCPManagedMachinePool{}
-			if err = r.Client.Get(ctx, key, infraMachinePool); err != nil {
-				return ctrl.Result{}, errors.Wrapf(err, "failed to fetch infra machine pool")
-			}
-			infraMachinePools[machinePoolCopy.Name] = infraMachinePool
+		if machinePool.Name == gcpControlPlane.Spec.DefaultPoolRef.Name {
+			defaultPoolFound = true
 		}
+		machinePools[machinePoolCopy.Name] = &machinePoolCopy
+		infraRef := machinePoolCopy.Spec.Template.Spec.InfrastructureRef
+		key := client.ObjectKey{Name: infraRef.Name, Namespace: infraRef.Namespace}
+		infraMachinePool := &infrav1exp.GCPManagedMachinePool{}
+		if err = r.Client.Get(ctx, key, infraMachinePool); err != nil {
+			return ctrl.Result{}, errors.Wrapf(err, "failed to fetch infra machine pool")
+		}
+		infraMachinePools[machinePoolCopy.Name] = infraMachinePool
+	}
+
+	if !defaultPoolFound {
+		return ctrl.Result{}, errors.Errorf("failed to find default pool %s", gcpControlPlane.Spec.DefaultPoolRef.Name)
 	}
 
 	// Create the scope.
@@ -163,10 +173,12 @@ func (r *GCPManagedControlPlaneReconciler) reconcileNormal(ctx context.Context, 
 
 	computeSvc := managedcompute.NewService(scope)
 
+	// Reconcile the network. If a non-default network is specified it needs to be created first.
 	if err := computeSvc.ReconcileNetwork(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile network for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}
 
+	// Reconcile the GKE cluster. This includes reconciling the endpoint and kubeconfig.
 	if err := computeSvc.ReconcileGKECluster(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE cluster for GCPManagedControlPlane %s/%s", scope.ControlPlane.Namespace, scope.ControlPlane.Name)
 	}

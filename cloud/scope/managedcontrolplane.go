@@ -158,3 +158,17 @@ func (s *ManagedControlPlaneScope) NodePoolReplicaCount(machinePoolName string) 
 	}
 	return int64(*s.MachinePools[machinePoolName].Spec.Replicas)
 }
+
+func (s *ManagedControlPlaneScope) FirstInfraMachinePool() *infrav1.GCPManagedMachinePool {
+	for _, mp := range s.InfraMachinePools {
+		return mp
+	}
+	return nil
+}
+
+func (s *ManagedControlPlaneScope) FirstInfraMachinePoolName() string {
+	for mpName := range s.InfraMachinePools {
+		return mpName
+	}
+	return ""
+}

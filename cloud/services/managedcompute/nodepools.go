@@ -26,8 +26,9 @@ import (
 )
 
 func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
+	nodePoolName := s.scope.NodePoolRelativeName(s.scope.FirstInfraMachinePoolName())
 	// Get node pool to check for existence
-	nodePool, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
+	nodePool, err := s.nodepools.Get(nodePoolName).Context(ctx).Do()
 	// Create node pool if it does not exist
 	if gcperrors.IsNotFound(err) {
 		s.scope.Logger.Info("Node pool not found, creating")
@@ -42,7 +43,7 @@ func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 			return errors.Wrapf(err, "failed to create node pool")
 		}
 		s.scope.Logger.Info("Operation done", "op", op.Name)
-		nodePool, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
+		nodePool, err = s.nodepools.Get(nodePoolName).Context(ctx).Do()
 		if err != nil {
 			return errors.Wrapf(err, "failed to describe cluster")
 		}
@@ -50,18 +51,17 @@ func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 
 	// TODO: Update node pool if it has been modified
 
-	oldMachinePool := s.scope.InfraMachinePools["default"].DeepCopyObject()
+	oldMachinePool := s.scope.FirstInfraMachinePool().DeepCopyObject()
 
 	// Reconcile provider status
-	s.scope.InfraMachinePools["default"].Status.ProviderStatus = nodePool.Status
+	s.scope.FirstInfraMachinePool().Status.ProviderStatus = nodePool.Status
 	if nodePool.Status == "ERROR" || nodePool.Status == "RUNNING_WITH_ERROR" {
-		s.scope.InfraMachinePools["default"].Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
+		s.scope.FirstInfraMachinePool().Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
 	} else {
-		s.scope.InfraMachinePools["default"].Status.ErrorMessage = nil
+		s.scope.FirstInfraMachinePool().Status.ErrorMessage = nil
 	}
 
-	s.scope.Logger.Info("Patching machine pool status")
-	if err := s.scope.Client.Patch(ctx, s.scope.InfraMachinePools["default"], client.MergeFrom(oldMachinePool)); err != nil {
+	if err := s.scope.Client.Patch(ctx, s.scope.FirstInfraMachinePool(), client.MergeFrom(oldMachinePool)); err != nil {
 		return errors.Wrapf(err, "failed to patch infra machine pool")
 	}
 
@@ -69,11 +69,12 @@ func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 }
 
 func (s *Service) DeleteGKENodePool(ctx context.Context) error {
-	_, err := s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
+	nodePoolName := s.scope.NodePoolRelativeName(s.scope.FirstInfraMachinePoolName())
+	_, err := s.nodepools.Get(nodePoolName).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}
-	op, err := s.nodepools.Delete(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
+	op, err := s.nodepools.Delete(nodePoolName).Context(ctx).Do()
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete nodepool")
 	}
@@ -82,7 +83,7 @@ func (s *Service) DeleteGKENodePool(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to delete nodepool")
 	}
 	s.scope.Logger.Info("Operation done", "op", op.Name)
-	_, err = s.nodepools.Get(s.scope.NodePoolRelativeName("default")).Context(ctx).Do()
+	_, err = s.nodepools.Get(nodePoolName).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
 	}

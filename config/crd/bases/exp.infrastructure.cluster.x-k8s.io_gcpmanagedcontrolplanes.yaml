@@ -40,8 +40,8 @@ spec:
       name: Endpoint
       priority: 1
       type: string
-    - description: GCPManagedMachinePool linked to this control plane
-      jsonPath: .spec.defaultPoolRef.name
+    - description: GCPManagedMachinePools linked to this control plane
+      jsonPath: .status.machinePools[*].name
       name: MachinePools
       priority: 1
       type: string
@@ -146,6 +146,19 @@ spec:
                   fully ready. In the GCPManagedControlPlane implementation, these
                   are identical.
                 type: boolean
+              machinePools:
+                description: MachinePools contains the list of machine pools attached
+                  to this cluster.
+                items:
+                  description: LocalObjectReference contains enough information to
+                    let you locate the referenced object inside the same namespace.
+                  properties:
+                    name:
+                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                        TODO: Add other useful fields. apiVersion, kind, uid?'
+                      type: string
+                  type: object
+                type: array
               providerStatus:
                 description: ProviderStatus is the status of the cluster as reported
                   by GKE

@@ -128,8 +128,8 @@ func (r *GCPManagedMachinePoolReconciler) Reconcile(req ctrl.Request) (result ct
 		Logger:            log,
 		ControlPlane:      controlPlane,
 		Cluster:           ownerCluster,
-		MachinePools:      map[string]*capiv1exp.MachinePool{"default": ownerPool},
-		InfraMachinePools: map[string]*infrav1exp.GCPManagedMachinePool{"default": infraPool},
+		MachinePools:      map[string]*capiv1exp.MachinePool{ownerPool.Name: ownerPool},
+		InfraMachinePools: map[string]*infrav1exp.GCPManagedMachinePool{ownerPool.Name: infraPool},
 		PatchTarget:       infraPool,
 	})
 	if err != nil {
@@ -161,7 +161,7 @@ func (r *GCPManagedMachinePoolReconciler) reconcileDelete(ctx context.Context, s
 	}
 
 	// Node pool is deleted so remove the finalizer.
-	controllerutil.RemoveFinalizer(scope.InfraMachinePools["default"], infrav1exp.ManagedMachinePoolFinalizer)
+	controllerutil.RemoveFinalizer(scope.FirstInfraMachinePool(), infrav1exp.ManagedMachinePoolFinalizer)
 
 	scope.Logger.Info("Successfully deleted")
 
@@ -172,7 +172,7 @@ func (r *GCPManagedMachinePoolReconciler) reconcileNormal(ctx context.Context, s
 	scope.Logger.Info("Reconciling GCPManagedMachinePool")
 
 	// If the GCPManagedMachinePool doesn't have our finalizer, add it.
-	controllerutil.AddFinalizer(scope.InfraMachinePools["default"], infrav1exp.ManagedMachinePoolFinalizer)
+	controllerutil.AddFinalizer(scope.FirstInfraMachinePool(), infrav1exp.ManagedMachinePoolFinalizer)
 	// Register the finalizer immediately to avoid orphaning GCP resources on delete
 	if err := scope.PatchObject(ctx); err != nil {
 		return ctrl.Result{}, err
@@ -186,11 +186,11 @@ func (r *GCPManagedMachinePoolReconciler) reconcileNormal(ctx context.Context, s
 
 	if err := computeSvc.ReconcileGKENodePool(ctx); err != nil {
 		return ctrl.Result{}, errors.Wrapf(err, "failed to reconcile GKE node pool for GCPManagedMachinePool %s/%s",
-			scope.InfraMachinePools["default"].Namespace, scope.InfraMachinePools["default"].Name)
+			scope.FirstInfraMachinePool().Namespace, scope.FirstInfraMachinePool().Name)
 	}
 
 	// No errors, so mark us ready so the Cluster API Cluster Controller can pull it
-	scope.InfraMachinePools["default"].Status.Ready = true
+	scope.FirstInfraMachinePool().Status.Ready = true
 
 	scope.Logger.Info("Successfully reconciled")
 

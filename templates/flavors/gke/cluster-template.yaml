@@ -73,6 +73,7 @@ spec:
   instanceType: "n1-standard-2"
   bootDiskSizeGB: 100
 ---
+# We can specify a second machine pool
 apiVersion: exp.cluster.x-k8s.io/v1alpha3
 kind: MachinePool
 metadata:

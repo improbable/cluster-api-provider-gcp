@@ -48,21 +48,21 @@ func (s *Service) ReconcileNetwork(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to describe network")
 	}
 
-	// TODO: Create the subnetwork as well
+	// TODO: Might want to create the subnetwork as well if we decide to honor the Cluster CIDR blocks
 
 	return nil
 }
 
 func (s *Service) getNetworkSpec() *compute.Network {
-	res := &compute.Network{
-		Name:                  s.scope.NetworkName(),
+	// TODO: We currently ignore the Cluster's CIDR blocks
+	return &compute.Network{
+		Name: s.scope.NetworkName(),
+		// Add a tag to the description to indicate that we own the network
 		Description:           infrav1.ClusterTagKey(s.scope.Name()),
 		AutoCreateSubnetworks: false,
 		// make sure AutoCreateSubnetworks field is included in request, else this creates a Legacy network
 		ForceSendFields: []string{"AutoCreateSubnetworks"},
 	}
-
-	return res
 }
 
 func (s *Service) DeleteNetwork(ctx context.Context) error {

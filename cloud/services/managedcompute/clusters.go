@@ -31,7 +31,6 @@ import (
 	infrav1exp "sigs.k8s.io/cluster-api-provider-gcp/exp/api/v1alpha3"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1alpha3"
 	"sigs.k8s.io/cluster-api/util/secret"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -60,8 +59,6 @@ func (s *Service) ReconcileGKECluster(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to describe cluster")
 	}
 
-	oldControlPlane := s.scope.ControlPlane.DeepCopyObject()
-
 	// Reconcile provider status
 	s.scope.ControlPlane.Status.ProviderStatus = cluster.Status
 
@@ -73,9 +70,13 @@ func (s *Service) ReconcileGKECluster(ctx context.Context) error {
 		}
 	}
 
-	if err := s.scope.Client.Patch(ctx, s.scope.ControlPlane, client.MergeFrom(oldControlPlane)); err != nil {
-		return errors.Wrapf(err, "failed to set control plane endpoint")
+	// Reconcile node pools
+	var nodePools []corev1.LocalObjectReference
+	for _, nodePool := range cluster.NodePools {
+		// HACK: the status field says MachinePool, but the node pool name is not necessarily equal to the machine pool
+		nodePools = append(nodePools, corev1.LocalObjectReference{Name: nodePool.Name})
 	}
+	s.scope.ControlPlane.Status.MachinePools = nodePools
 
 	// Reconcile kubeconfig
 	if cluster.Endpoint != "" && cluster.MasterAuth.ClusterCaCertificate != "" && cluster.MasterAuth.Password != "" {
@@ -123,8 +124,8 @@ func (s *Service) ReconcileGKECluster(ctx context.Context) error {
 }
 
 func (s *Service) DeleteGKECluster(ctx context.Context) error {
-	// TODO: might need to clean up more resources than just the cluster
-
+	// TODO: might need to clean up more resources than just the cluster. LBs and PVs are not deleted
+	// https://cloud.google.com/kubernetes-engine/docs/how-to/deleting-a-cluster
 	cluster, err := s.clusters.Get(s.scope.ClusterRelativeName()).Context(ctx).Do()
 	if gcperrors.IsNotFound(err) {
 		return nil
@@ -155,9 +156,11 @@ func (s *Service) getGKESpec() *container.Cluster {
 	cluster := &container.Cluster{
 		InitialClusterVersion: s.scope.KubernetesVersion(),
 		IpAllocationPolicy: &container.IPAllocationPolicy{
+			// Automatically create subnetworks to avoid having to manually create them
 			CreateSubnetwork: true,
-			SubnetworkName:   s.scope.SubnetworkName(),
-			UseIpAliases:     true,
+			// If the user has specified a custom subnetwork, use it
+			SubnetworkName: s.scope.SubnetworkName(),
+			UseIpAliases:   true,
 		},
 		MasterAuth: &container.MasterAuth{
 			// Enable HTTP Basic Auth to allow the generation of a kubeconfig that bypasses Google OAuth
@@ -167,12 +170,12 @@ func (s *Service) getGKESpec() *container.Cluster {
 		Name:    s.scope.ControlPlane.Name,
 		Network: s.scope.NetworkName(),
 		NetworkPolicy: &container.NetworkPolicy{
+			// Enable calico for NetworkPolicy support
 			Enabled:  true,
 			Provider: "CALICO",
 		},
-		// TODO: We should specify all the node pools available at creation to prevent potential master scaling and
-		// increasing provision times.
-		// https://github.com/scylladb/scylla-operator/issues/9#issuecomment-478262197
+		// We specify all the node pools available at creation to prevent potential master scaling and
+		// increasing provision times. https://github.com/scylladb/scylla-operator/issues/9#issuecomment-478262197
 		NodePools:      s.getNodePoolsSpec(),
 		ResourceLabels: s.scope.ControlPlane.Spec.AdditionalLabels,
 	}

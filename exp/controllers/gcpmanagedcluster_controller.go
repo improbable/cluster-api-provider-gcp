@@ -81,21 +81,22 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 		return ctrl.Result{}, nil
 	}
 
+	log = log.WithValues("cluster", cluster.Name)
+
+	// Fetch the GCPManagedControlPlane for the cluster
 	controlPlane := &infrav1exp.GCPManagedControlPlane{}
 	controlPlaneRef := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
 		Namespace: cluster.Namespace,
 	}
 
-	log = log.WithValues("cluster", cluster.Name)
-
 	if err := r.Get(ctx, controlPlaneRef, controlPlane); err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "failed to get control plane ref")
+		return ctrl.Result{}, errors.Wrapf(err, "failed to get control plane ref %v", controlPlaneRef)
 	}
 
 	log = log.WithValues("controlPlane", controlPlaneRef.Name)
 
-	patchhelper, err := patch.NewHelper(gcpCluster, r.Client)
+	patchHelper, err := patch.NewHelper(gcpCluster, r.Client)
 	if err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "failed to init patch helper")
 	}
@@ -105,7 +106,7 @@ func (r *GCPManagedClusterReconciler) Reconcile(req ctrl.Request) (_ ctrl.Result
 	gcpCluster.Status.Ready = controlPlane.Status.Ready
 	gcpCluster.Spec.ControlPlaneEndpoint = controlPlane.Spec.ControlPlaneEndpoint
 
-	if err := patchhelper.Patch(ctx, gcpCluster); err != nil {
+	if err := patchHelper.Patch(ctx, gcpCluster); err != nil {
 		return ctrl.Result{}, err
 	}
 
