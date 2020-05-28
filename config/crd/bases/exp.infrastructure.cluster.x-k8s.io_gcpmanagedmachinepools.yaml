@@ -54,6 +54,28 @@ spec:
           spec:
             description: GCPManagedMachinePoolSpec defines the desired state of GCPManagedMachinePool
             properties:
+              autoscaling:
+                description: Autoscaling contains the autoscaling config for the pool.
+                  If specified, the MachinePool replicas is ignored. This does not
+                  match the cluster-api contract for MachinePool that expects a fixed
+                  size.
+                properties:
+                  maxNodeCount:
+                    description: 'MaxNodeCount: Maximum number of nodes in the NodePool.
+                      Must be >= minNodeCount.'
+                    format: int64
+                    minimum: 1
+                    type: integer
+                  minNodeCount:
+                    description: 'MinNodeCount: Minimum number of nodes in the NodePool.
+                      Must be >= 1 and <= maxNodeCount.'
+                    format: int64
+                    minimum: 1
+                    type: integer
+                required:
+                - maxNodeCount
+                - minNodeCount
+                type: object
               bootDiskSizeGB:
                 description: BootDiskSizeGB is the disk size for every machine in
                   this pool. If you specify 0, it will apply the default size.
@@ -100,6 +122,8 @@ spec:
                 type: boolean
               replicas:
                 description: Replicas is the most recently observed number of replicas.
+                  This is currently ignored as the GKE API does not expose this without
+                  looking at the underlying VMs.
                 format: int32
                 type: integer
             type: object

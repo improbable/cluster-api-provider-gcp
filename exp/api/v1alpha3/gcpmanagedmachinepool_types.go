@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	// ManagedMachinePoolFinalizer allows ReconcileGCPManagedMachinePool to clean up GCP resources associated with #
+	// ManagedMachinePoolFinalizer allows ReconcileGCPManagedMachinePool to clean up GCP resources associated with a
 	// GCPManagedMachinePool before removing it from the apiserver.
 	ManagedMachinePoolFinalizer = "gcpmanagedmachinepool.exp.infrastructure.cluster.x-k8s.io"
 )
@@ -46,6 +46,11 @@ type GCPManagedMachinePoolSpec struct {
 	// Preemptible determines if the nodes are preemptible. Defaults to false.
 	// +optional
 	Preemptible bool `json:"preemptible,omitempty"`
+
+	// Autoscaling contains the autoscaling config for the pool. If specified, the MachinePool replicas is ignored.
+	// This does not match the cluster-api contract for MachinePool that expects a fixed size.
+	// +optional
+	Autoscaling *AutoscalingSpec `json:"autoscaling,omitempty"`
 }
 
 // GCPManagedMachinePoolStatus defines the observed state of GCPManagedMachinePool
@@ -55,6 +60,7 @@ type GCPManagedMachinePoolStatus struct {
 	Ready bool `json:"ready"`
 
 	// Replicas is the most recently observed number of replicas.
+	// This is currently ignored as the GKE API does not expose this without looking at the underlying VMs.
 	// +optional
 	Replicas int32 `json:"replicas"`
 

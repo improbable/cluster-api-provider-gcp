@@ -27,3 +27,14 @@ type ManagedNetworkSpec struct {
 	// +optional
 	Subnetwork *string `json:"subnetwork,omitempty"`
 }
+
+
+type AutoscalingSpec struct {
+	// MaxNodeCount: Maximum number of nodes in the NodePool. Must be >= minNodeCount.
+	// +kubebuilder:validation:Minimum=1
+	MaxNodeCount int64 `json:"maxNodeCount"`
+
+	// MinNodeCount: Minimum number of nodes in the NodePool. Must be >= 1 and <= maxNodeCount.
+	// +kubebuilder:validation:Minimum=1
+	MinNodeCount int64 `json:"minNodeCount"`
+}
