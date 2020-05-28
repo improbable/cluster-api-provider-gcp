@@ -52,49 +52,6 @@ func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 	}
 
 	// TODO: Update node pool if it has been modified
-	if nodePool.Autoscaling.Enabled != nodePoolSpec.Autoscaling.Enabled {
-		return errors.Wrapf(err, "unable to enable/disable autoscaling after creation")
-	}
-	if nodePool.Autoscaling.Enabled {
-		if nodePool.Autoscaling.MinNodeCount != nodePoolSpec.Autoscaling.MinNodeCount ||
-			nodePool.Autoscaling.MaxNodeCount != nodePoolSpec.Autoscaling.MaxNodeCount {
-			s.scope.Logger.Info("Autoscaling config changed, resizing")
-			op, err := s.nodepools.SetAutoscaling(nodePoolName, &container.SetNodePoolAutoscalingRequest{
-				Autoscaling: nodePoolSpec.Autoscaling,
-			}).Context(ctx).Do()
-			if err != nil {
-				return errors.Wrapf(err, "failed to resize node pool")
-			}
-			s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-			if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
-				return errors.Wrapf(err, "failed to resize node pool")
-			}
-			s.scope.Logger.Info("Operation done", "op", op.Name)
-			nodePool, err = s.nodepools.Get(nodePoolName).Context(ctx).Do()
-			if err != nil {
-				return errors.Wrapf(err, "failed to describe node pool")
-			}
-		}
-	} else {
-		if nodePool.InitialNodeCount != nodePoolSpec.InitialNodeCount {
-			s.scope.Logger.Info("Node pool size changed, resizing")
-			op, err := s.nodepools.SetSize(nodePoolName, &container.SetNodePoolSizeRequest{
-				NodeCount: nodePoolSpec.InitialNodeCount,
-			}).Context(ctx).Do()
-			if err != nil {
-				return errors.Wrapf(err, "failed to resize node pool")
-			}
-			s.scope.Logger.Info("Waiting for operation", "op", op.Name)
-			if err := wait.ForContainerOperation(ctx, s.scope.Containers, s.scope.Project(), s.scope.Location(), op); err != nil {
-				return errors.Wrapf(err, "failed to resize node pool")
-			}
-			s.scope.Logger.Info("Operation done", "op", op.Name)
-			nodePool, err = s.nodepools.Get(nodePoolName).Context(ctx).Do()
-			if err != nil {
-				return errors.Wrapf(err, "failed to describe node pool")
-			}
-		}
-	}
 
 	// Reconcile provider status
 	s.scope.FirstInfraMachinePool().Status.ProviderStatus = nodePool.Status
@@ -134,6 +91,9 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 	nodePools := make([]*container.NodePool, len(s.scope.InfraMachinePools))
 	for machinePoolName, machinePool := range s.scope.InfraMachinePools {
 		nodePool := &container.NodePool{
+			Autoscaling: &container.NodePoolAutoscaling{
+				Enabled: false,
+			},
 			Config: s.getNodePoolConfig(machinePoolName),
 			Name:   machinePool.Name,
 			// For regional clusters, this is the node count per zone
