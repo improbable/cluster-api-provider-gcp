@@ -71,7 +71,7 @@ func (s *Service) ReconcileGKECluster(ctx context.Context) error {
 	}
 
 	// Reconcile node pools
-	var nodePools []corev1.LocalObjectReference
+	nodePools := make([]corev1.LocalObjectReference, len(cluster.NodePools))
 	for _, nodePool := range cluster.NodePools {
 		// HACK: the status field says MachinePool, but the node pool name is not necessarily equal to the machine pool
 		nodePools = append(nodePools, corev1.LocalObjectReference{Name: nodePool.Name})

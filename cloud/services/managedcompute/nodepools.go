@@ -135,11 +135,11 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 	for machinePoolName, machinePool := range s.scope.InfraMachinePools {
 		nodePool := &container.NodePool{
 			Config: s.getNodePoolConfig(machinePoolName),
-			Name:             machinePool.Name,
+			Name:   machinePool.Name,
 		}
 		if machinePool.Spec.Autoscaling != nil {
 			nodePool.Autoscaling = &container.NodePoolAutoscaling{
-				Enabled: true,
+				Enabled:      true,
 				MinNodeCount: machinePool.Spec.Autoscaling.MinNodeCount,
 				MaxNodeCount: machinePool.Spec.Autoscaling.MaxNodeCount,
 			}
@@ -153,12 +153,12 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 }
 
 func (s *Service) getNodePoolConfig(machinePoolName string) *container.NodeConfig {
-	var gcpTaints []*container.NodeTaint
+	gcpTaints := make([]*container.NodeTaint, len(s.scope.InfraMachinePools[machinePoolName].Spec.Taints))
 	for _, taint := range s.scope.InfraMachinePools[machinePoolName].Spec.Taints {
 		gcpTaints = append(gcpTaints, &container.NodeTaint{
 			Effect: string(taint.Effect),
-			Key: taint.Key,
-			Value: taint.Value,
+			Key:    taint.Key,
+			Value:  taint.Value,
 		})
 	}
 	return &container.NodeConfig{
