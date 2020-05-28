@@ -22,7 +22,6 @@ import (
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/gcperrors"
 	"sigs.k8s.io/cluster-api-provider-gcp/cloud/wait"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
@@ -97,18 +96,12 @@ func (s *Service) ReconcileGKENodePool(ctx context.Context) error {
 		}
 	}
 
-	oldMachinePool := s.scope.FirstInfraMachinePool().DeepCopyObject()
-
 	// Reconcile provider status
 	s.scope.FirstInfraMachinePool().Status.ProviderStatus = nodePool.Status
 	if nodePool.Status == "ERROR" || nodePool.Status == "RUNNING_WITH_ERROR" {
 		s.scope.FirstInfraMachinePool().Status.ErrorMessage = pointer.StringPtr(nodePool.StatusMessage)
 	} else {
 		s.scope.FirstInfraMachinePool().Status.ErrorMessage = nil
-	}
-
-	if err := s.scope.Client.Patch(ctx, s.scope.FirstInfraMachinePool(), client.MergeFrom(oldMachinePool)); err != nil {
-		return errors.Wrapf(err, "failed to patch infra machine pool")
 	}
 
 	return nil
