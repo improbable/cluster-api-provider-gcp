@@ -136,6 +136,8 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 		nodePool := &container.NodePool{
 			Config: s.getNodePoolConfig(machinePoolName),
 			Name:   machinePool.Name,
+			// For regional clusters, this is the node count per zone
+			InitialNodeCount: s.scope.NodePoolReplicaCount(machinePoolName),
 		}
 		if machinePool.Spec.Autoscaling != nil {
 			nodePool.Autoscaling = &container.NodePoolAutoscaling{
@@ -143,9 +145,6 @@ func (s *Service) getNodePoolsSpec() []*container.NodePool {
 				MinNodeCount: machinePool.Spec.Autoscaling.MinNodeCount,
 				MaxNodeCount: machinePool.Spec.Autoscaling.MaxNodeCount,
 			}
-		} else {
-			// For regional clusters, this is the node count per zone
-			nodePool.InitialNodeCount = s.scope.NodePoolReplicaCount(machinePoolName)
 		}
 		nodePools = append(nodePools, nodePool)
 	}

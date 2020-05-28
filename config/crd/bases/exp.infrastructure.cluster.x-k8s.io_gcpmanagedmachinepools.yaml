@@ -56,9 +56,8 @@ spec:
             properties:
               autoscaling:
                 description: Autoscaling contains the autoscaling config for the pool.
-                  If specified, the MachinePool replicas is ignored. This does not
-                  match the cluster-api contract for MachinePool that expects a fixed
-                  size.
+                  This does not match the cluster-api contract for MachinePool that
+                  expects a fixed size.
                 properties:
                   maxNodeCount:
                     description: 'MaxNodeCount: Maximum number of nodes in the NodePool.

@@ -48,7 +48,7 @@ type GCPManagedMachinePoolSpec struct {
 	// +optional
 	Preemptible bool `json:"preemptible,omitempty"`
 
-	// Autoscaling contains the autoscaling config for the pool. If specified, the MachinePool replicas is ignored.
+	// Autoscaling contains the autoscaling config for the pool.
 	// This does not match the cluster-api contract for MachinePool that expects a fixed size.
 	// +optional
 	Autoscaling *AutoscalingSpec `json:"autoscaling,omitempty"`
