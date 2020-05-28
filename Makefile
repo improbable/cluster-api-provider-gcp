@@ -336,6 +336,11 @@ create-gke-workload-cluster: $(KUSTOMIZE) $(ENVSUBST)
 	# Create GKE workload Cluster.
 	$(KUSTOMIZE) build templates/flavors/gke | $(ENVSUBST) | kubectl apply -f -
 
+	# Wait for the kubeconfig to become available.
+	timeout 5m bash -c "while ! kubectl get secrets | grep $(CLUSTER_NAME)-kubeconfig; do sleep 1; done"
+	# Get kubeconfig and store it locally.
+	kubectl get secrets $(CLUSTER_NAME)-kubeconfig -o json | jq -r .data.value | base64 --decode > ./kubeconfig
+
 .PHONY: create-cluster
 create-cluster: create-management-cluster create-workload-cluster ## Create a development Kubernetes cluster on GCP in a KIND management cluster.
 
